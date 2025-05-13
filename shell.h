@@ -31,12 +31,6 @@ void help() {
     printf("\nHelp: Type 'teste' to test success or 'exit' to quit.\n\n");
 }
 
-void exit_program() {
-    printf("\nExiting...\n\n");
-    
-    exit(0);  // Exit the program
-}
-
 //  Fim dos Comandos testes
 
 #endif //SHELL_H_INCLUDED
