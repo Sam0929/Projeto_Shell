@@ -2,6 +2,10 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <string.h>
+#include <dirent.h>
+#include <errno.h>
+
+#include "shell.h"
 
 #define COMMAND_LENGTH 100
 
@@ -11,19 +15,20 @@ typedef struct {
 } Command;
 
 
-void teste();
-void help();
-void exit();
-
 // Main function
-int main() {
+int main(int argc, char *argv[]) {
 
     char entry[COMMAND_LENGTH];
 
     Command commands[] = {
+        {"cd", cd},
+        {"path", path},
+        {"pwd", pwd},
+        {"cat", cat},
+        {"ls", ls},
         {"teste", teste},
         {"help", help},
-        {"exit", exit}
+        {"exit", exit_program},
     };
 
     int num_commands = sizeof(commands) / sizeof(commands[0]);  // Number of commands
@@ -43,6 +48,7 @@ int main() {
         }
 
         int found = 0;
+
         for (int i = 0; i < num_commands; i++) {
             if (strcmp(entry, commands[i].command) == 0) {
                 commands[i].action();  
@@ -59,16 +65,3 @@ int main() {
     return 0;
 }
 
-// Command Handlers
-void teste() {
-    printf("Success!!\n");
-}
-
-void help() {
-    printf("Help: Type 'teste' to test success or 'exit' to quit.\n");
-}
-
-void exit() {
-    printf("Exiting...\n");
-    exit(0);  // Exit the program
-}
