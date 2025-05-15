@@ -4,6 +4,8 @@
 #include <string.h>
 #include <dirent.h>
 #include <errno.h>
+#include <unistd.h>
+#include <sys/wait.h>
 
 #include "shell.h"
 
@@ -15,9 +17,9 @@ typedef struct {
 } Command;
 
 char **parsing (char input[100]);
-char **read ();
+char **reading ();
 
-char **read(){
+char **reading(){
 
     char input[1024];
 
@@ -78,7 +80,7 @@ int main(int argc, char *argv[]) {
 
         printf(">>> ");
 
-        char **args = read();
+        char **args = reading();
 
         if (args[0] == NULL) {
             // Comando vazio (ex: enter sozinho)
@@ -99,7 +101,6 @@ int main(int argc, char *argv[]) {
             return 0;
         }
 
-        
 
         for (int i = 0; i < num_commands; i++) {
 
