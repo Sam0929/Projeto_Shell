@@ -4,7 +4,7 @@
 
 // Comandos a implementar
 
-void cd(char **args) { //Muda o diretório de trabalho.
+int cd(char **args) { //Muda o diretório de trabalho.
 
     int msg;
 
@@ -13,54 +13,89 @@ void cd(char **args) { //Muda o diretório de trabalho.
     if (msg == -1){
         // printf("Error Number: %d\n", errno);
         printf("Error Description: %s\n", strerror(errno));
+        return -1;
     }
-    
-    return;
-}
-void path() { //Define caminho(s) para busca de executáveis.
-    return;
-}
-void pwd () { // Exibir o caminho do diretório atual.
-    return;
-}
-void cat () { // Lê o conteúdo do arquivo no argumento e o escreve na saída padrão.
-    return;
-}
-void ls (char **args) { // lista o conteúdo do diretório atual. Seu ls deve suportar os parâmetros -l e -a conforme o funcionamento do ls original.
 
-    pid_t PID;
+    return 0;
+}
 
-    PID = fork();
+int path() { //Define caminho(s) para busca de executáveis.
+    return 0;
+}
 
-    if (PID == -1) {
-        perror("fork");
+int exec_command (char **args) {
+
+    pid_t pid;
+
+    pid = fork();
+
+    if (pid == -1) {
+        perror("fork failed");
         exit(EXIT_FAILURE);
     }
 
-    if (PID == 0){
+    if (pid == 0){
 
-        int status_code = execvp(args[0], args);
-
-        if (status_code == -1) {
-            printf("Process did not terminate correctly\n");
-            exit(1);
+        if(strcmp(args[0], "ls") == 0){
+            printf("\033[0;32m");               //  Mudando o terminal para a cor verde
+            fflush(stdout);
+            if (fflush(stdout) == EOF) {
+                perror("fflush falhou");
+            }
         }
+
+        execvp(args[0], args);
+
+        perror("execvp falhou");
+
+        if (errno == ENOENT)
+            _exit(127);  // comando não encontrado
+        else
+            _exit(126);  // não executável ou outro erro
     }
 
-    wait(NULL);
-    
-    return;
+    // Pai: espera o filho terminar, tratando interrupções por sinais
+    int status;
+    pid_t w;
+
+    do {
+        w = waitpid(pid, &status, 0);
+    } while (w == -1 && errno == EINTR);
+
+    if (w == -1) {
+        perror("waitpid falhou");
+        return -1;
+    }
+
+    printf("\033[0m");  // Resetar a cor antes de sair
+
+    if (WIFEXITED(status)) {
+        int exit_code = WEXITSTATUS(status);
+        // printf("Comando terminou com código %d\n", exit_code);
+        return exit_code;
+    }
+    else if (WIFSIGNALED(status)) {
+        int sig = WTERMSIG(status);
+        fprintf(stderr, "Processo filho terminou por sinal %d\n", sig);
+        return 128 + sig;  // convenção de shells para sinal
+    }
+
+    // Casos raros (ex.: parou por trap)
+    return -1;
 }
+
 //  Fim dos comandos a implementar
 
 
 //  Comandos testes
-void teste() {
+int teste() {
     printf("\nSuccess!!\n\n");
+    return 0;
 }
 
-void help() {
+int help() {
     printf("\nHelp: Type 'teste' to test success or 'exit' to quit.\n\n");
+    return 0;
 }
 
 //  Fim dos Comandos testes

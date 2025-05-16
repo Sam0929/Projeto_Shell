@@ -13,7 +13,7 @@
 
 typedef struct {
     const char *command;
-    void (*action)(char **args);  
+    int (*action)(char **args);
 } Command;
 
 char **parsing (char input[100]);
@@ -25,16 +25,16 @@ char **reading(){
 
     fgets(input, sizeof(input), stdin);
 
-    for (int i = 0; input[i]; i++) {    //Padronizando a entrada de dados
-        input[i] = tolower(input[i]);
-    }
+    // for (int i = 0; input[i]; i++) {    //Padronizando a entrada de dados
+    //     input[i] = tolower(input[i]);
+    // }
 
     return parsing (input);
-    
+
 }
 
 char **parsing (char input[100]){
-    
+
 
     char **args = (char**) malloc(50 * sizeof(char));  // Lista de argumentos
     char *token = strtok(input, " \t\n");
@@ -46,8 +46,12 @@ char **parsing (char input[100]){
         token = strtok(NULL, " \t\n");
     }
 
+    for (int i = 0; args[0][i]; i++){
+        args [0][i] = tolower(args[0][i]);  // Padronizando o comando a ser reconhecido
+    }
+
     args[i] = NULL;
-    
+
     return args;
 
 }
@@ -60,9 +64,9 @@ int main(int argc, char *argv[]) {
 
         {"cd", cd},
         {"path", path},
-        {"pwd", pwd},
-        {"cat", cat},
-        {"ls", ls},
+        {"pwd", exec_command},
+        {"cat", exec_command},
+        {"ls", exec_command},
         {"teste", teste},
         {"help", help},
 
@@ -88,6 +92,7 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
+
         // Comando para sair
 
         if (strcmp(args[0], "exit") == 0) {
@@ -105,7 +110,7 @@ int main(int argc, char *argv[]) {
         for (int i = 0; i < num_commands; i++) {
 
             if (strcmp(args[0], commands[i].command) == 0) {
-                commands[i].action(args);  
+                commands[i].action(args);
                 found = 1;
                 break;
             }
