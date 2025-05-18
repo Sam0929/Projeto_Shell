@@ -98,6 +98,18 @@ int help() {
     return 0;
 }
 
+void exiting(char **args){
+
+    printf("\nExiting...\n\n");
+
+    for (int i = 0; args[i]; i++) free(args[i]);
+
+    free(args);
+
+    exit(0);
+
+}
+
 //  Fim dos Comandos testes
 
 #endif //SHELL_H_INCLUDED
