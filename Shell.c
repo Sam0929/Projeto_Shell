@@ -11,11 +11,6 @@
 
 #define COMMAND_LENGTH 100
 
-typedef struct {
-    const char *command;
-    void (*action)(char **args);  
-} Command;
-
 char **parsing (char input[100]);
 char **reading ();
 
@@ -25,19 +20,16 @@ char **reading(){
 
     fgets(input, sizeof(input), stdin);
 
-    for (int i = 0; input[i]; i++) {    //Padronizando a entrada de dados
-        input[i] = tolower(input[i]);
-    }
-
     return parsing (input);
-    
+
 }
 
 char **parsing (char input[100]){
-    
 
-    char **args = (char**) malloc(50 * sizeof(char));  // Lista de argumentos
+
+    char **args = malloc(50 * sizeof(char *));  // Lista de argumentos
     char *token = strtok(input, " \t\n");
+
     int i = 0;
 
     while (token != NULL) {
@@ -45,30 +37,19 @@ char **parsing (char input[100]){
         args[i++] = strdup(token);
         token = strtok(NULL, " \t\n");
     }
+    if (i != 0){
+        for (int i = 0; args[0][i]; i++){
+            args [0][i] = tolower(args[0][i]);  // Padronizando o comando a ser reconhecido
+        }
+    }
 
     args[i] = NULL;
-    
+
     return args;
 
 }
 
-
-// Main function
 int main(int argc, char *argv[]) {
-
-    Command commands[] = {
-
-        {"cd", cd},
-        {"path", path},
-        {"pwd", pwd},
-        {"cat", cat},
-        {"ls", ls},
-        {"teste", teste},
-        {"help", help},
-
-    };
-
-    int num_commands = sizeof(commands) / sizeof(commands[0]);  // Number of commands
 
     int found = 0;  // flag comando encontrado
 
@@ -78,38 +59,36 @@ int main(int argc, char *argv[]) {
 
     while(1) {
 
+        found = 0;
+
         printf(">>> ");
 
         char **args = reading();
 
-        if (args[0] == NULL) {
-            // Comando vazio (ex: enter sozinho)
+        if (args[0] == NULL){
             free(args);
             continue;
         }
 
-        // Comando para sair
+        if (strcmp(args[0], "exit") == 0){
+            exiting(args);
+            found = 1;
+        }else if (strcmp(args[0], "cd") == 0){
+            cd(args);
+            found = 1;
+        }
+        else if (strcmp(args[0], "help") == 0){
+            help();
+            found = 1;
+        }
+        else if (strcmp(args[0], "ls") == 0  ||
+                 strcmp(args[0], "pwd") == 0 ||
+                 strcmp(args[0], "cat") == 0 ){
 
-        if (strcmp(args[0], "exit") == 0) {
-
-            printf("\nExiting...\n\n");
-
-            for (int i = 0; args[i]; i++) free(args[i]);
-
-            free(args);
-
-            return 0;
+            exec_command(args);
+            found = 1;
         }
 
-
-        for (int i = 0; i < num_commands; i++) {
-
-            if (strcmp(args[0], commands[i].command) == 0) {
-                commands[i].action(args);  
-                found = 1;
-                break;
-            }
-        }
 
         if (!found) {
             printf("Invalid command. Type 'help' for a list of valid commands.\n");
