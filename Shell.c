@@ -14,6 +14,7 @@
 char **parsing (char input[100]);
 
 void execute_parallel_commands(char *input); // Declaração da função para executar comandos em paralelo
+int execute_pipeline(char *input); // Declaração da função para executar comandos em pipeline
 
 char **parsing (char input[100]){
 
@@ -62,6 +63,9 @@ int main(int argc, char *argv[]) {
 
         if (strchr(input, '&') != NULL) {
             execute_parallel_commands(input);
+        }
+        if (strchr(input, '|') != NULL) {
+            execute_pipeline(input);
         }
 
         char **args = parsing(input);
@@ -151,5 +155,63 @@ void execute_parallel_commands(char *input) {
     for (int i = 0; i < num_cmds; i++) {
         free(commands[i]);
     }
+}
+
+int execute_pipeline(char *input) {
+    char *commands[10];  // Máximo de 10 comandos encadeados
+    int num_cmds = 0;
+
+    // Separar por '|'
+    char *token = strtok(input, "|");
+    while (token != NULL && num_cmds < 10) {
+        while (*token == ' ') token++;  // Remover espaços à esquerda
+        commands[num_cmds++] = token;
+        token = strtok(NULL, "|");
+    }
+
+    int pipefd[2], prev_fd = -1;
+
+    for (int i = 0; i < num_cmds; i++) {
+        pipe(pipefd);
+
+        pid_t pid = fork();
+
+        if (pid == 0) {
+            // Filho
+            if (i < num_cmds - 1) {
+                // Se não for o último, redireciona stdout para pipe de saída
+                dup2(pipefd[1], STDOUT_FILENO);
+            }
+
+            if (i > 0) {
+                // Se não for o primeiro, redireciona stdin para a entrada anterior
+                dup2(prev_fd, STDIN_FILENO);
+            }
+
+            // Fecha descritores de pipe no processo filho
+            close(pipefd[0]);
+            close(pipefd[1]);
+            if (prev_fd != -1) close(prev_fd);
+
+            char **args = parsing(commands[i]);
+
+            execvp(args[0], args);
+            perror("Erro no execvp");
+            exit(1);
+        }
+
+        // Pai: fecha descritores que não vai usar
+        if (prev_fd != -1) close(prev_fd);
+        close(pipefd[1]);
+
+        prev_fd = pipefd[0];  // O próximo comando vai ler deste pipe
+    }
+
+    // Espera todos os filhos
+    for (int i = 0; i < num_cmds; i++) {
+        wait(NULL);
+    }
+
+    return 0;
 }
 

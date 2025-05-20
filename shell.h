@@ -51,15 +51,7 @@ int exec_command (char **args) {
                 exit(EXIT_FAILURE);
             }
         }
-
-        if(strcmp(args[0], "ls") == 0){
-            printf("\033[0;32m");               //  Mudando o terminal para a cor verde
-            fflush(stdout);
-            if (fflush(stdout) == EOF) {
-                perror("fflush falhou");
-            }
-        }
-
+        
         execvp(args[0], args);
 
         perror("execvp falhou");
