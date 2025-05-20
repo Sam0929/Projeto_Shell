@@ -36,6 +36,22 @@ int exec_command (char **args) {
 
     if (pid == 0){
 
+        int redirect = -1;
+        for (int i = 0; args[i]; i++) {
+            if (strcmp(args[i], ">") == 0) {
+                redirect = i;
+            }
+        }
+
+        if (redirect != -1) {
+            args[redirect] = NULL; // fim dos args do comando
+            FILE *out = freopen(args[redirect + 1], "w", stdout);
+            if (!out) {
+                perror("Erro ao redirecionar saída");
+                exit(EXIT_FAILURE);
+            }
+        }
+
         if(strcmp(args[0], "ls") == 0){
             printf("\033[0;32m");               //  Mudando o terminal para a cor verde
             fflush(stdout);
