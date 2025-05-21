@@ -1,6 +1,12 @@
 #ifndef SHELL_H_INCLUDED
 #define SHELL_H_INCLUDED
 
+// Struct para o path
+
+typedef struct {
+    char **path_list;
+    int path_count;
+} ShellState;
 
 // Comandos a implementar
 
@@ -23,7 +29,7 @@ int path() { //Define caminho(s) para busca de executáveis.
     return 0;
 }
 
-int exec_command (char **args) {
+int exec_command (ShellState *state, char **args) {
 
     pid_t pid;
 
@@ -36,6 +42,8 @@ int exec_command (char **args) {
 
     if (pid == 0){
 
+        char exec_path[1024];
+
         if(strcmp(args[0], "ls") == 0){
             printf("\033[0;32m");               //  Mudando o terminal para a cor verde
             fflush(stdout);
@@ -44,57 +52,132 @@ int exec_command (char **args) {
             }
         }
 
-        execvp(args[0], args);
+        for (int i = 0; i < state->path_count; i++) {
+            snprintf(exec_path, sizeof(exec_path), "%s/%s", state->path_list[i], args[0]);
+            execv(exec_path, args);                            // tenta executar
+        }
 
-        perror("execvp falhou");
+        fprintf(stderr, "Command not found in specified paths\n");
 
         if (errno == ENOENT)
             _exit(127);  // comando não encontrado
         else
             _exit(126);  // não executável ou outro erro
     }
+    else{
 
-    // Pai: espera o filho terminar, tratando interrupções por sinais
-    int status;
-    pid_t w;
+        // Pai: espera o filho terminar, tratando interrupções por sinais
+        int status;
+        pid_t w;
 
-    do {
-        w = waitpid(pid, &status, 0);
-    } while (w == -1 && errno == EINTR);
+        do {
+            w = waitpid(pid, &status, 0);
+        } while (w == -1 && errno == EINTR);
 
-    if (w == -1) {
-        perror("waitpid falhou");
+        printf("\033[0m");  // Resetar a cor antes de sair
+
+        if (w == -1) {
+            perror("waitpid falhou");
+            return -1;
+        }
+
+        if (WIFEXITED(status)) {
+            int exit_code = WEXITSTATUS(status);
+                                                        // printf("Comando terminou com código %d\n", exit_code);
+            return exit_code;
+        }
+        else if (WIFSIGNALED(status)) {
+            int sig = WTERMSIG(status);
+            fprintf(stderr, "Processo filho terminou por sinal %d\n", sig);
+            return 128 + sig;                           // convenção de shells para sinal
+        }
+
+        // Casos raros (ex.: parou por trap)
         return -1;
-    }
 
-    printf("\033[0m");  // Resetar a cor antes de sair
-
-    if (WIFEXITED(status)) {
-        int exit_code = WEXITSTATUS(status);
-        // printf("Comando terminou com código %d\n", exit_code);
-        return exit_code;
     }
-    else if (WIFSIGNALED(status)) {
-        int sig = WTERMSIG(status);
-        fprintf(stderr, "Processo filho terminou por sinal %d\n", sig);
-        return 128 + sig;  // convenção de shells para sinal
-    }
-
-    // Casos raros (ex.: parou por trap)
-    return -1;
 }
+
+void update_path(ShellState *state, char **args) {
+
+    if (args[1] == NULL) {
+                                                                // Nenhum argumento extra: mostrar os caminhos atuais
+        printf("Caminhos atuais:\n");
+
+        for (int i = 0; i < state->path_count; i++) {
+            printf("%s\n", state->path_list[i]);
+        }
+
+        return;
+    }
+
+
+    for (int i = 0; i < state->path_count; i++) {                     // Libera os caminhos antigos
+        free(state->path_list[i]);
+    }
+
+    free(state->path_list);
+
+
+    int count = 0;                                                   // Conta os novos caminhos
+    while (args[count + 1] != NULL) count++;
+
+
+    state->path_list = malloc(count * sizeof(char *));              // Aloca e copia os novos caminhos
+    state->path_count = count;
+
+    for (int i = 0; i < count; i++) {
+        state->path_list[i] = strdup(args[i + 1]);
+    }
+}
+
+
 
 //  Fim dos comandos a implementar
 
-
-//  Comandos testes
-int teste() {
-    printf("\nSuccess!!\n\n");
-    return 0;
-}
-
 int help() {
-    printf("\nHelp: Type 'teste' to test success or 'exit' to quit.\n\n");
+
+    printf("\n╔══════════════════════════════════════════════════════╗\n");
+    printf("║                    PUCC SHELL - AJUDA                ║\n");
+    printf("╚══════════════════════════════════════════════════════╝\n\n");
+
+    printf("Comandos internos:\n");
+    printf("--------------------------------------------------------\n");
+    printf("  help\n");
+    printf("    → Mostra esta tela de ajuda.\n\n");
+
+    printf("  exit\n");
+    printf("    → Encerra o shell.\n\n");
+
+    printf("  cd <diretório>\n");
+    printf("    → Altera o diretório atual para o especificado.\n");
+    printf("    → Exemplo: cd /home/usuario\n\n");
+
+    printf("  path [<caminho1> <caminho2> ...]\n");
+    printf("    → Define os diretórios de busca para comandos externos.\n");
+    printf("    → Se nenhum caminho for informado, mostra os caminhos atuais.\n");
+    printf("    → Exemplo: path /bin /usr/bin\n");
+    printf("    → Exemplo: path\n\n");
+
+    printf("Comandos externos:\n");
+    printf("--------------------------------------------------------\n");
+    printf("  <comando> [argumentos]\n");
+    printf("    → Executa um programa localizado em um dos caminhos definidos com 'path'.\n");
+    printf("    → Exemplo: ls -l\n");
+    printf("    → Exemplo: cat arquivo.txt\n\n");
+
+    printf("Observações:\n");
+    printf("--------------------------------------------------------\n");
+    printf("  - Os comandos são separados por espaços (como em qualquer terminal Unix).\n");
+    printf("  - Ainda não há suporte para redirecionamentos (>, >>) ou pipes (|).\n");
+    printf("  - Pressione Ctrl+C para encerrar comandos em execução (se necessário).\n");
+    printf("  - Este shell é um projeto educacional com funcionalidades básicas.\n\n");
+
+    printf("════════════════════════════════════════════════════════\n");
+    printf("Digite 'help' a qualquer momento para rever esta ajuda.\n");
+    printf("════════════════════════════════════════════════════════\n\n");
+
+
     return 0;
 }
 
@@ -102,8 +185,9 @@ void exiting(char **args){
 
     printf("\nExiting...\n\n");
 
-    for (int i = 0; args[i]; i++) free(args[i]);
-
+    for (int i = 0; args[i] != NULL; i++) {
+        free(args[i]);
+    }
     free(args);
 
     exit(0);
