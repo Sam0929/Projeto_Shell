@@ -2,3 +2,4 @@ Shell
 *.o
 *.txt
 .vscode
+sum

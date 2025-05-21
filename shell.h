@@ -1,4 +1,4 @@
-#ifndef SHELL_H_INCLUDED
+#ifndef SHELL_H_INCLUDED        //BIBLIOTECA PARA IMPLEMENTACAO DOS COMANDOS DO SHELL
 #define SHELL_H_INCLUDED
 
 // Struct para o path
@@ -25,8 +25,35 @@ int cd(char **args) { //Muda o diretório de trabalho.
     return 0;
 }
 
-int path() { //Define caminho(s) para busca de executáveis.
-    return 0;
+void update_path(ShellState *state, char **args) {
+
+    if (args[1] == NULL) {
+                                                                // Nenhum argumento extra: mostrar os caminhos atuais
+        printf("Caminhos atuais:\n");
+
+        for (int i = 0; i < state->path_count; i++) {
+            printf("%s\n", state->path_list[i]);
+        }
+
+        return;
+    }
+
+    for (int i = 0; i < state->path_count; i++) {                     // Libera os caminhos antigos
+        free(state->path_list[i]);
+    }
+
+    free(state->path_list);
+
+    int count = 0;                                                   // Conta os novos caminhos
+    while (args[count + 1] != NULL) count++;
+
+
+    state->path_list = malloc(count * sizeof(char *));              // Aloca e copia os novos caminhos
+    state->path_count = count;
+
+    for (int i = 0; i < count; i++) {
+        state->path_list[i] = strdup(args[i + 1]);
+    }
 }
 
 int exec_command (ShellState *state, char **args) {
@@ -44,28 +71,30 @@ int exec_command (ShellState *state, char **args) {
 
         char exec_path[1024];
 
-        if(strcmp(args[0], "ls") == 0){
-            printf("\033[0;32m");               //  Mudando o terminal para a cor verde
-            fflush(stdout);
-            if (fflush(stdout) == EOF) {
-                perror("fflush falhou");
+        if (strchr(args[0], '/')) {
+
+            execv(args[0], args);   // O comando tem uma barra -> é um caminho direto
+            printf("%s: %s\n", args[0], strerror(errno));
+        }
+
+        else{
+
+            for (int i = 0; i < state->path_count; i++) {
+                snprintf(exec_path, sizeof(exec_path), "%s/%s", state->path_list[i], args[0]);
+                execv(exec_path, args);                            // tenta executar
             }
+
+            printf("%s: %s\n", args[0], strerror(errno));
+
+            // fprintf(stderr, "Command not found in specified paths\n");
+
+            // if (errno == ENOENT)
+            //     _exit(127);  // comando não encontrado
+            // else
+            //     _exit(126);  // não executável ou outro erro
         }
-
-        for (int i = 0; i < state->path_count; i++) {
-            snprintf(exec_path, sizeof(exec_path), "%s/%s", state->path_list[i], args[0]);
-            execv(exec_path, args);                            // tenta executar
-        }
-
-        fprintf(stderr, "Command not found in specified paths\n");
-
-        if (errno == ENOENT)
-            _exit(127);  // comando não encontrado
-        else
-            _exit(126);  // não executável ou outro erro
     }
     else{
-
         // Pai: espera o filho terminar, tratando interrupções por sinais
         int status;
         pid_t w;
@@ -74,8 +103,6 @@ int exec_command (ShellState *state, char **args) {
             w = waitpid(pid, &status, 0);
         } while (w == -1 && errno == EINTR);
 
-        printf("\033[0m");  // Resetar a cor antes de sair
-
         if (w == -1) {
             perror("waitpid falhou");
             return -1;
@@ -83,7 +110,7 @@ int exec_command (ShellState *state, char **args) {
 
         if (WIFEXITED(status)) {
             int exit_code = WEXITSTATUS(status);
-                                                        // printf("Comando terminou com código %d\n", exit_code);
+                                                     //    printf("Comando terminou com código %d\n", exit_code);
             return exit_code;
         }
         else if (WIFSIGNALED(status)) {
@@ -98,44 +125,9 @@ int exec_command (ShellState *state, char **args) {
     }
 }
 
-void update_path(ShellState *state, char **args) {
-
-    if (args[1] == NULL) {
-                                                                // Nenhum argumento extra: mostrar os caminhos atuais
-        printf("Caminhos atuais:\n");
-
-        for (int i = 0; i < state->path_count; i++) {
-            printf("%s\n", state->path_list[i]);
-        }
-
-        return;
-    }
-
-
-    for (int i = 0; i < state->path_count; i++) {                     // Libera os caminhos antigos
-        free(state->path_list[i]);
-    }
-
-    free(state->path_list);
-
-
-    int count = 0;                                                   // Conta os novos caminhos
-    while (args[count + 1] != NULL) count++;
-
-
-    state->path_list = malloc(count * sizeof(char *));              // Aloca e copia os novos caminhos
-    state->path_count = count;
-
-    for (int i = 0; i < count; i++) {
-        state->path_list[i] = strdup(args[i + 1]);
-    }
-}
-
-
-
 //  Fim dos comandos a implementar
 
-int help() {
+void help() {
 
     printf("\n╔══════════════════════════════════════════════════════╗\n");
     printf("║                    PUCC SHELL - AJUDA                ║\n");
@@ -177,8 +169,6 @@ int help() {
     printf("Digite 'help' a qualquer momento para rever esta ajuda.\n");
     printf("════════════════════════════════════════════════════════\n\n");
 
-
-    return 0;
 }
 
 void exiting(char **args){

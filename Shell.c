@@ -11,63 +11,19 @@
 
 
 #include "shell.h"
+#include "read_parse.h"
 
 #define COMMAND_LENGTH 100
 
-char **parsing (char input[100]);
-char **reading ( );
-
-char **reading(){
-
-    char *linha = readline(">>> ");
-
-    if (linha == NULL) {
-        // Ctrl+D
-        printf("\n");
-        exit(0);
-    }
-    if (strlen(linha) > 0) {
-        add_history(linha);  // adiciona ao histórico se não for vazia
-    }
-
-    char **tokens = parsing(linha);
-
-    free(linha);
-
-    return tokens;
-
-}
-
-char **parsing (char *input){
-
-
-    char **args = malloc(50 * sizeof(char *));  // Lista de argumentos
-    char *token = strtok(input, " \t\n");
-
-    int i = 0;
-
-    while (token != NULL) {
-
-        args[i++] = strdup(token);
-        token = strtok(NULL, " \t\n");
-    }
-    if (i != 0){
-        for (int i = 0; args[0][i]; i++){
-            args [0][i] = tolower(args[0][i]);  // Padronizando o comando a ser reconhecido
-        }
-    }
-
-    args[i] = NULL;
-
-    return args;
-
-}
-
 int main(int argc, char *argv[]) {
+
+    ShellState state = {NULL, 0};  // inicializando a struct para o path
 
     int found = 0;  // flag comando encontrado
 
-    ShellState state = {NULL, 0};
+    if (argc > 1) {
+        update_path(&state, argv);
+    }
 
     printf("SamTum Terminal\n\n");
     printf("Welcome To SamTum Terminal\n");
@@ -106,9 +62,7 @@ int main(int argc, char *argv[]) {
             update_path(&state, args);
             found = 1;
         }
-        else if (strcmp(args[0], "ls") == 0  ||
-                 strcmp(args[0], "pwd") == 0 ||
-                 strcmp(args[0], "cat") == 0 ){
+        else {
 
             exec_command(&state, args);
             found = 1;
