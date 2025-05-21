@@ -21,7 +21,10 @@ cd PastaVM
 gcc -c Shell.c
 gcc -o Shell Shell.o -lreadline
 ```
-
+### Especifique o diretorio que contem os comandos externos?
+```sh
+path /usr/bin
+```
 ### Para Executar o Shell:
 ```sh
 ./Shell
