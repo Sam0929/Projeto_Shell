@@ -19,7 +19,7 @@ cd PastaVM
 ### Para compilar o projeto:
 ```sh
 gcc -c Shell.c
-gcc -o Shell Shell.o
+gcc -o Shell Shell.o -lreadline
 ```
 
 ### Para Executar o Shell:
