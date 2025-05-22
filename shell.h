@@ -1,6 +1,10 @@
 #ifndef SHELL_H_INCLUDED        //BIBLIOTECA PARA IMPLEMENTACAO DOS COMANDOS DO SHELL
 #define SHELL_H_INCLUDED
 
+// Prototype
+
+void replace_ls_exa(char **args);
+
 // Struct para o path
 
 typedef struct {
@@ -71,6 +75,12 @@ int exec_command (ShellState *state, char **args) {
 
         char exec_path[1024];
 
+        if (strcmp(args[0], "ls") == 0) {
+
+            replace_ls_exa(args);                 // TALVEZ SEJA NECESSARIO: sudo apt install exa
+
+        }
+
         if (strchr(args[0], '/')) {
 
             execv(args[0], args);   // O comando tem uma barra -> é um caminho direto
@@ -88,10 +98,10 @@ int exec_command (ShellState *state, char **args) {
 
             // fprintf(stderr, "Command not found in specified paths\n");
 
-            // if (errno == ENOENT)
-            //     _exit(127);  // comando não encontrado
-            // else
-            //     _exit(126);  // não executável ou outro erro
+            if (errno == ENOENT)
+                _exit(127);  // comando não encontrado
+            else
+                _exit(126);  // não executável ou outro erro
         }
     }
     else{
@@ -168,6 +178,22 @@ void help() {
     printf("════════════════════════════════════════════════════════\n");
     printf("Digite 'help' a qualquer momento para rever esta ajuda.\n");
     printf("════════════════════════════════════════════════════════\n\n");
+
+}
+
+void replace_ls_exa(char **args){
+
+    args[0] = "exa";
+
+    int count = 0;
+
+    while (args[count] != NULL) {
+        count++;
+    }
+    // Adiciona --header e --icons no final
+    args[count++] = "--header";
+    args[count++] = "--icons";
+    args[count] = NULL; // finaliza com NULL
 
 }
 

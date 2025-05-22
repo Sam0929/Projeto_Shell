@@ -1,8 +1,12 @@
 #ifndef READ_PARSE_H_INCLUDED           // BIBLIOTECA PARA I/O
 #define READ_PARSE_H_INCLUDED
 
+// Prototype
+
 char **parsing (char input[100]);
 char **reading ();
+
+// Functions to read and parse
 
 char **reading(){
 
