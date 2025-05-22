@@ -4,6 +4,7 @@
 // Prototype
 
 void replace_ls_exa(char **args);
+void redirect(char **args);
 
 // Struct para o path
 
@@ -75,16 +76,20 @@ int exec_command (ShellState *state, char **args) {
 
         char exec_path[1024];
 
-        if (strcmp(args[0], "ls") == 0) {
+        // if (strcmp(args[0], "ls") == 0) {
 
-            replace_ls_exa(args);                 // TALVEZ SEJA NECESSARIO: sudo apt install exa
+        //     replace_ls_exa(args);                 // TALVEZ SEJA NECESSARIO: sudo apt install exa
 
-        }
+        // }
+       
+        redirect(args);
+        
 
         if (strchr(args[0], '/')) {
 
             execv(args[0], args);   // O comando tem uma barra -> é um caminho direto
             printf("%s: %s\n", args[0], strerror(errno));
+            
         }
 
         else{
@@ -97,12 +102,16 @@ int exec_command (ShellState *state, char **args) {
             printf("%s: %s\n", args[0], strerror(errno));
 
             // fprintf(stderr, "Command not found in specified paths\n");
-
-            if (errno == ENOENT)
-                _exit(127);  // comando não encontrado
-            else
-                _exit(126);  // não executável ou outro erro
         }
+
+        if (errno == ENOENT){
+            _exit(127);  // comando não encontrado
+        }
+        else{
+            _exit(126);  // não executável ou outro erro
+            }
+
+        exit(0);  //saida sem erros
     }
     else{
         // Pai: espera o filho terminar, tratando interrupções por sinais
@@ -181,22 +190,45 @@ void help() {
 
 }
 
-void replace_ls_exa(char **args){
+// void replace_ls_exa(char **args){
 
-    args[0] = "exa";
+//     args[0] = "exa";
 
-    int count = 0;
+//     int count = 0;
 
-    while (args[count] != NULL) {
-        count++;
+//     while (args[count] != NULL) {
+//         count++;
+//     }
+//     // Adiciona --header e --icons no final
+//     args[count++] = "--header";
+//     args[count++] = "--icons";
+//     args[count] = NULL; // finaliza com NULL
+
+// }
+void redirect (char **args){
+
+    int redirect = -1;
+
+    for (int i = 0; args[i]; i++) {
+        if (strcmp(args[i], ">") == 0) {
+            redirect = i;
+        }
     }
-    // Adiciona --header e --icons no final
-    args[count++] = "--header";
-    args[count++] = "--icons";
-    args[count] = NULL; // finaliza com NULL
 
+    if (redirect != -1){
+        fflush(stdout);
+        args[redirect] = NULL;
+        if (freopen(args[redirect + 1], "w", stdout) == NULL){
+              perror("Erro ao redirecionar saída");
+              exit(1);
+        }
+        else{
+            fprintf(stderr, "Saída redirecionada com sucesso!\n");
+        }
+    }
+
+    return;
 }
-
 void exiting(char **args){
 
     printf("\nExiting...\n\n");
