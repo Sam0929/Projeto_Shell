@@ -12,6 +12,10 @@
 ```sh
 sudo mount -t vboxsf "NomeDaPastaCompartilhada" "PastaVM"
 ```
+### Instale o readline
+```sh
+sudo apt install libreadline-dev
+```
 ### Mude para o diretório que o mount foi executado "PastaVM":
 ```sh
 cd PastaVM
