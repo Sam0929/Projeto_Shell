@@ -15,6 +15,12 @@
 
 #define COMMAND_LENGTH 100
 
+//Prototype
+
+void catching_exec_errors(int status, char **args);
+
+//Main
+
 int main(int argc, char *argv[]) {
 
     ShellState state = {NULL, 0};  // inicializando a struct para o path
@@ -64,15 +70,31 @@ int main(int argc, char *argv[]) {
         }
         else {
 
-            exec_command(&state, args);
+            int status = exec_command(&state, args);    //DESENVOLVER: tratamento de erros reportados pelo processo pai
+            catching_exec_errors(status, args);
             found = 1;
         }
 
+        free_memory(args);  // Necessario para garantir que nenhum vazamento de memória ocorra.
 
         if (!found) {
             printf("Invalid command. Type 'help' for a list of valid commands.\n");
         }
     }
 
+}
+
+void catching_exec_errors(int status, char **args){
+
+    if (status == 126) {
+        fprintf(stderr, "Permissão negada ou arquivo não é executável: %s\n", args[0]);
+    }
+    else if (status == 127) {
+        fprintf(stderr, "Comando não encontrado: %s\n", args[0]);
+    }
+    else if (status >= 128) {
+        int sig = status - 128;
+        fprintf(stderr, "Comando terminado por sinal: %d\n", sig);
+    }
 }
 

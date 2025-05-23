@@ -5,6 +5,7 @@
 
 void replace_ls_exa(char **args);
 void redirect(char **args);
+void absolute_path(char **args);
 
 // Struct para o path
 
@@ -74,75 +75,62 @@ int exec_command (ShellState *state, char **args) {
 
     if (pid == 0){
 
+        // =========== FILHO ===========
+
         char exec_path[1024];
 
-        // if (strcmp(args[0], "ls") == 0) {
+        redirect(args);                     // Verifica se deve haver um redirecionamento do saida padrao do processo filho
 
-        //     replace_ls_exa(args);                 // TALVEZ SEJA NECESSARIO: sudo apt install exa
+        absolute_path(args);                // Verifica se um caminho absoluto foi passado
 
+        // for (int i = 0; args[i] != NULL; i++){          // para testes
+        //     printf("%s", args[i]);
         // }
-       
-        redirect(args);
-        
+        // fflush(stdout);
 
-        if (strchr(args[0], '/')) {
+        int tried = 0;
 
-            execv(args[0], args);   // O comando tem uma barra -> é um caminho direto
-            printf("%s: %s\n", args[0], strerror(errno));
-            
+        for (int i = 0; i < state->path_count; i++) {
+
+            snprintf(exec_path, sizeof(exec_path), "%s/%s", state->path_list[i], args[0]);
+            execv(exec_path, args);                            // tenta executar
+            tried = 1;
         }
 
-        else{
+        const char *err_msg;
 
-            for (int i = 0; i < state->path_count; i++) {
-                snprintf(exec_path, sizeof(exec_path), "%s/%s", state->path_list[i], args[0]);
-                execv(exec_path, args);                            // tenta executar
-            }
-
-            printf("%s: %s\n", args[0], strerror(errno));
-
-            // fprintf(stderr, "Command not found in specified paths\n");
+        if (!tried) {
+            err_msg = "Nenhum caminho disponível para o comando\n";
+        } else if (errno == ENOENT) {
+            err_msg = "Comando não encontrado\n";
+        } else {
+            err_msg = "Falha ao executar comando\n";
         }
 
-        if (errno == ENOENT){
-            _exit(127);  // comando não encontrado
-        }
-        else{
-            _exit(126);  // não executável ou outro erro
-            }
-
-        exit(0);  //saida sem erros
+        write(STDERR_FILENO, err_msg, strlen(err_msg));  //write utilizado para evitar problemas com buffer herdado do processo pai
+        _exit(tried && errno == ENOENT ? 127 : 126);
     }
     else{
-        // Pai: espera o filho terminar, tratando interrupções por sinais
-        int status;
-        pid_t w;
 
-        do {
-            w = waitpid(pid, &status, 0);
-        } while (w == -1 && errno == EINTR);
+    // =========== Pai ===========
 
-        if (w == -1) {
-            perror("waitpid falhou");
-            return -1;
-        }
+    int status;
 
-        if (WIFEXITED(status)) {
-            int exit_code = WEXITSTATUS(status);
-                                                     //    printf("Comando terminou com código %d\n", exit_code);
-            return exit_code;
-        }
-        else if (WIFSIGNALED(status)) {
-            int sig = WTERMSIG(status);
-            fprintf(stderr, "Processo filho terminou por sinal %d\n", sig);
-            return 128 + sig;                           // convenção de shells para sinal
-        }
+    while (waitpid(pid, &status, 0) == -1 && errno == EINTR); // Aguarda filho, reiniciando se for interrompido por sinal
 
-        // Casos raros (ex.: parou por trap)
-        return -1;
-
+    if (WIFEXITED(status)) {
+        return WEXITSTATUS(status);
     }
+    if (WIFSIGNALED(status)) {
+
+        return 128 + WTERMSIG(status); // Convenção: retorno 128+signal
+    }
+
+        return -1; // Outros casos — retornar erro genérico
+    }
+
 }
+
 
 //  Fim dos comandos a implementar
 
@@ -190,21 +178,6 @@ void help() {
 
 }
 
-// void replace_ls_exa(char **args){
-
-//     args[0] = "exa";
-
-//     int count = 0;
-
-//     while (args[count] != NULL) {
-//         count++;
-//     }
-//     // Adiciona --header e --icons no final
-//     args[count++] = "--header";
-//     args[count++] = "--icons";
-//     args[count] = NULL; // finaliza com NULL
-
-// }
 void redirect (char **args){
 
     int redirect = -1;
@@ -229,14 +202,35 @@ void redirect (char **args){
 
     return;
 }
+void absolute_path(char **args){
+
+    if (strchr(args[0], '/')) {
+
+        execv(args[0], args);   // O comando tem uma barra -> é um caminho direto
+        perror(args[0]);
+        _exit(126);
+    }
+
+    return;
+
+}
+
+void free_memory(char **args){
+
+    for (int i = 0; args[i] != NULL; i++) {
+
+        free(args[i]);
+
+    }
+
+    free(args);
+
+}
 void exiting(char **args){
 
     printf("\nExiting...\n\n");
 
-    for (int i = 0; args[i] != NULL; i++) {
-        free(args[i]);
-    }
-    free(args);
+    free_memory(args);
 
     exit(0);
 
