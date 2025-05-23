@@ -16,7 +16,7 @@ typedef struct {
 
 // Comandos a implementar
 
-int cd(char **args) { //Muda o diretório de trabalho.
+void cd(char **args) { //Muda o diretório de trabalho.
 
     int msg;
 
@@ -25,10 +25,7 @@ int cd(char **args) { //Muda o diretório de trabalho.
     if (msg == -1){
         // printf("Error Number: %d\n", errno);
         printf("Error Description: %s\n", strerror(errno));
-        return -1;
     }
-
-    return 0;
 }
 
 void update_path(ShellState *state, char **args) {
@@ -62,7 +59,7 @@ void update_path(ShellState *state, char **args) {
     }
 }
 
-int exec_command (ShellState *state, char **args) {
+void exec_command (ShellState *state, char **args) {
 
     pid_t pid;
 
@@ -83,52 +80,32 @@ int exec_command (ShellState *state, char **args) {
 
         absolute_path(args);                // Verifica se um caminho absoluto foi passado
 
-        // for (int i = 0; args[i] != NULL; i++){          // para testes
-        //     printf("%s", args[i]);
-        // }
-        // fflush(stdout);
-
-        int tried = 0;
-
         for (int i = 0; i < state->path_count; i++) {
 
             snprintf(exec_path, sizeof(exec_path), "%s/%s", state->path_list[i], args[0]);
             execv(exec_path, args);                            // tenta executar
-            tried = 1;
         }
 
-        const char *err_msg;
-
-        if (!tried) {
-            err_msg = "Nenhum caminho disponível para o comando\n";
-        } else if (errno == ENOENT) {
-            err_msg = "Comando não encontrado\n";
-        } else {
-            err_msg = "Falha ao executar comando\n";
-        }
-
-        write(STDERR_FILENO, err_msg, strlen(err_msg));  //write utilizado para evitar problemas com buffer herdado do processo pai
-        _exit(tried && errno == ENOENT ? 127 : 126);
+        _exit(errno); // Se exec chegou aqui, um erro aconteceu, retorna para o pai
     }
     else{
 
     // =========== Pai ===========
 
-    int status;
+        int status;
 
-    while (waitpid(pid, &status, 0) == -1 && errno == EINTR); // Aguarda filho, reiniciando se for interrompido por sinal
+        while (waitpid(pid, &status, 0) == -1 && errno == EINTR); // Aguarda filho, reiniciando se for interrompido por sinal
 
-    if (WIFEXITED(status)) {
-        return WEXITSTATUS(status);
+        if (WIFEXITED(status)) {  // Verifica se o processo filho saiu por exit
+
+            int code = WEXITSTATUS(status);  //Extrai o codigo de saida  de exit
+            if(code != 0 ){
+                fprintf(stderr, "Erro ao executar '%s': %s\n", args[0], strerror(code));  //Exibe o erro do processo filho
+            }
+
+         }
+
     }
-    if (WIFSIGNALED(status)) {
-
-        return 128 + WTERMSIG(status); // Convenção: retorno 128+signal
-    }
-
-        return -1; // Outros casos — retornar erro genérico
-    }
-
 }
 
 
@@ -193,10 +170,7 @@ void redirect (char **args){
         args[redirect] = NULL;
         if (freopen(args[redirect + 1], "w", stdout) == NULL){
               perror("Erro ao redirecionar saída");
-              exit(1);
-        }
-        else{
-            fprintf(stderr, "Saída redirecionada com sucesso!\n");
+              _exit(errno);
         }
     }
 
@@ -207,12 +181,11 @@ void absolute_path(char **args){
     if (strchr(args[0], '/')) {
 
         execv(args[0], args);   // O comando tem uma barra -> é um caminho direto
-        perror(args[0]);
-        _exit(126);
+
+        _exit(errno);
     }
 
     return;
-
 }
 
 void free_memory(char **args){

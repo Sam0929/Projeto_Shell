@@ -13,12 +13,6 @@
 #include "shell.h"
 #include "read_parse.h"
 
-#define COMMAND_LENGTH 100
-
-//Prototype
-
-void catching_exec_errors(int status, char **args);
-
 //Main
 
 int main(int argc, char *argv[]) {
@@ -69,9 +63,7 @@ int main(int argc, char *argv[]) {
             found = 1;
         }
         else {
-
-            int status = exec_command(&state, args);    //DESENVOLVER: tratamento de erros reportados pelo processo pai
-            catching_exec_errors(status, args);
+            exec_command(&state, args);    //DESENVOLVER: tratamento de erros reportados pelo processo pai
             found = 1;
         }
 
@@ -82,19 +74,5 @@ int main(int argc, char *argv[]) {
         }
     }
 
-}
-
-void catching_exec_errors(int status, char **args){
-
-    if (status == 126) {
-        fprintf(stderr, "Permissão negada ou arquivo não é executável: %s\n", args[0]);
-    }
-    else if (status == 127) {
-        fprintf(stderr, "Comando não encontrado: %s\n", args[0]);
-    }
-    else if (status >= 128) {
-        int sig = status - 128;
-        fprintf(stderr, "Comando terminado por sinal: %d\n", sig);
-    }
 }
 
