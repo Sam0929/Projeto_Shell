@@ -27,7 +27,7 @@ gcc -o Shell Shell.o -lreadline
 ```
 ### Para Executar o Shell:
 ```sh
-./Shell
+./Shell /usr/bin
 ```
 ### Especifique o diretorio que contem os comandos externos:
 ```sh

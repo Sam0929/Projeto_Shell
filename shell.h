@@ -176,6 +176,13 @@ void redirect (char **args){
 
     return;
 }
+// void exec_pipe (char **args){
+
+//     int pipe = -1;
+
+//     return;
+
+// }
 void absolute_path(char **args){
 
     if (strchr(args[0], '/')) {

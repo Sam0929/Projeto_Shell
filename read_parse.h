@@ -3,7 +3,7 @@
 
 // Prototype
 
-char **parsing (char input[100]);
+char **parsing (char *input, char *ignore);
 char **reading ();
 
 // Functions to read and parse
@@ -21,7 +21,7 @@ char **reading(){
         add_history(linha);  // adiciona ao histórico se não for vazia
     }
 
-    char **tokens = parsing(linha);
+    char **tokens = parsing(linha, " \t\n");
 
     free(linha);
 
@@ -29,18 +29,18 @@ char **reading(){
 
 }
 
-char **parsing (char *input){
+char **parsing (char *input, char *ignore){
 
 
     char **args = malloc(50 * sizeof(char *));  // Lista de argumentos
-    char *token = strtok(input, " \t\n");
+    char *token = strtok(input, ignore);       // " \t\n"
 
     int i = 0;
 
     while (token != NULL) {
 
         args[i++] = strdup(token);
-        token = strtok(NULL, " \t\n");
+        token = strtok(NULL, ignore);
     }
     if (i != 0){
         for (int i = 0; args[0][i]; i++){
