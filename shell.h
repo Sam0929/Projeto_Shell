@@ -104,6 +104,8 @@ void exec_command (ShellState *state, char **args) {
             }
 
          }
+        
+        return;
 
     }
 }
