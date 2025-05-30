@@ -18,13 +18,24 @@ typedef struct {
 
 void cd(char **args) { //Muda o diretório de trabalho.
 
-    int msg;
+    if (args[1] == NULL) {
 
-    msg = chdir(args [1]);
+        const char *home_dir = getenv("HOME");
+        if (home_dir == NULL) {
+            fprintf(stderr, "cd: variável HOME não definida\n");
+            return;
+        }
+        if (chdir(home_dir) == -1) {
+            perror("cd");
+        }
 
-    if (msg == -1){
-        // printf("Error Number: %d\n", errno);
-        printf("Error Description: %s\n", strerror(errno));
+    } else if (args[2] != NULL) { // "cd dir1 dir2" e um erro
+        fprintf(stderr, "cd: muitos argumentos\n");
+    }
+    else {
+        if (chdir(args[1]) == -1) {
+            perror("cd");
+        }
     }
 }
 
@@ -86,7 +97,8 @@ void exec_command (ShellState *state, char **args) {
             execv(exec_path, args);                            // tenta executar
         }
 
-        _exit(errno); // Se exec chegou aqui, um erro aconteceu, retorna para o pai
+        fprintf(stderr, "%s: comando não encontrado\n", args[0]);
+        _exit(127); // Código de saída padrão para "comando não encontrado"
     }
     else{
 
@@ -104,7 +116,7 @@ void exec_command (ShellState *state, char **args) {
             }
 
          }
-        
+
         return;
 
     }
@@ -208,11 +220,9 @@ void free_memory(char **args){
     free(args);
 
 }
-void exiting(char **args){
+void exiting(){
 
     printf("\nExiting...\n\n");
-
-    free_memory(args);
 
     exit(0);
 

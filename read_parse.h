@@ -1,16 +1,28 @@
 #ifndef READ_PARSE_H_INCLUDED           // BIBLIOTECA PARA I/O
 #define READ_PARSE_H_INCLUDED
 
+// Struct
+
+typedef struct {
+    char **args; // Argumentos para execvp (ex: {"ls", "-l", NULL})
+} ParsedCommand;
+
+typedef struct {
+    ParsedCommand *commands; // Array de comandos
+    int num_commands;        // Número de comandos no pipeline (1 se não for pipeline)
+} CommandLine;
+
 // Prototype
 
-char **parsing (char *input, char *delimiter, int def);
-char **reading ();
-char **pipe_parsing   (char *linha);
+CommandLine* reading ();
+CommandLine* parse_line(const char *line);
+void free_command_line(CommandLine *cmd_line);
+char **parsing_commands (char *input);
+
+
 // Functions to read and parse
 
-char **reading(){
-
-    char **tokens;
+CommandLine* reading(){
 
     char *linha = readline(">>> ");
 
@@ -23,77 +35,143 @@ char **reading(){
         add_history(linha);  // adiciona ao historico se nao for vazia
     }
 
-    if (strchr(linha, '|')){  // Se nao tiver o caracter NULL e retornado e o if e invalido
-        pipe_parsing(linha);
-        
-    }
+    CommandLine *cmd_data = parse_line(linha);
 
-    if(strchr(linha, '&')){
-        printf("SIM PARALELO");
-        fflush(stdout);
-    }
+    free (linha);
 
-    tokens = parsing(linha, " \t\n", 1);
-
-    free(linha);
-
-    return tokens;
-
+    return cmd_data;
 }
 
-char **parsing (char *input, char *delimiter, int def){
+char **parsing_commands (char *input){
 
+    char **args = malloc(50 * sizeof(char *));       // Lista de argumentos
 
-    char **args = malloc(50 * sizeof(char *));  // Lista de argumentos
-    char *token = strtok(input, delimiter);       // " \t\n" // strtok encontra o delimitador e substitui ele por \0
+    if (!args) {
+        perror("Falha ao alocar argumentos!");
+        return NULL;
+    }
+    const char *delimiters = " \t\n";
+    char *token = strtok(input, delimiters);        // " \t\n" // strtok encontra o delimitador e substitui ele por \0
 
     int i = 0;
 
-    while (token != NULL) {
+    while (token != NULL && i < 49) {
 
-        args[i++] = strdup(token);           //Copia a string até o primeiro \0 para args
-        token = strtok(NULL, delimiter);
-    }
+        args[i] = strdup(token);                  //Copia a string até o primeiro \0 para args
 
-
-    if (i != 0){
-        for (int i = 0; args[0][i]; i++){
-            args [0][i] = tolower(args[0][i]);  // Padronizando o comando a ser reconhecido
+        if (!args[i]) {
+            perror("Falha ao duplicar token!");
+            for (int k = 0; k < i; k++) {
+                free(args[k]);
+            }
+            free(args);
+            return NULL;
         }
+
+        token = strtok(NULL, delimiters);
+        i++;
     }
 
-    if (def){
-        args[i] = NULL;
-    }
-   
+    args[i] = NULL;
+
+    //  for (int i = 0; args[i] != NULL; i++){          // para testes
+    //     printf("string [%d] = %s",i, args[i]);
+    //  }
+    //  fflush(stdout);
 
     return args;
 
 }
 
-char **pipe_parsing(char *linha){
+CommandLine* parse_line(const char *line) {
 
-    int n_commands = 0;
-    char **pipe_tokens;
-    pipe_tokens = parsing(linha, "|", 0);
-    
-    while (pipe_tokens[n_commands]) n_commands++;
-
-    char ***commands = malloc((n_commands + 1) * sizeof(char**)); // Lista de lista de strings
-
-        for (int i = 0; i < n_commands; i++) {
-        commands[i] = parsing(pipe_tokens[i], " \t\n", 1);
+    if (line == NULL || strlen(line) == 0) {
+        return NULL;
     }
-        
-    for (int i = 0; i < n_commands; i++) {
-        printf("Comando %d:\n", i);
-        for (int j = 0; commands[i][j]; j++) {
-            printf("  [%d][%d] = '%s'\n", i, j, commands[i][j]);
+    // 1. Alocar a estrutura CommandLine
+    CommandLine *cmd_line = malloc(sizeof(CommandLine));
+    if (!cmd_line) {
+        perror("Falha ao alocar CommandLine");
+        return NULL;
+    }
+    cmd_line->commands = NULL;
+    cmd_line->num_commands = 0;
+
+    int num_pipes = 0;
+    for (const char *p = line; (p = strchr(p, '|')) != NULL; p++) {  // contagem de pipes, p recebe um ponteiro para o primeiro |, strchar retorna null quando nao existem mais |
+        num_pipes++;
+    }
+    int num_cmds = num_pipes + 1;
+
+    if (num_cmds == 0 && strlen(line) > 0) {                   // sem pipe mas ainda existe um comando
+        num_cmds = 1;
+    } else if (num_cmds == 0 && strlen(line) == 0) {           //comando vazio
+        free(cmd_line);
+
+        return NULL;
+    }
+
+    cmd_line->num_commands = num_cmds;
+    cmd_line->commands = malloc(num_cmds * sizeof(ParsedCommand));
+
+    if (!cmd_line->commands) {
+        perror("Falha ao alocar array de ParsedCommand");
+        free(cmd_line);
+        return NULL;
+    }
+
+    char *line_copy = strdup(line); // Trabalhar em uma cópia para strtok_r ou strtok
+
+    if (!line_copy) {
+        perror("strdup_line_copy");
+        free(cmd_line->commands);
+        free(cmd_line);
+        return NULL;
+    }
+
+    char *saveptr; // Para strtok_r, se preferir (mais seguro)
+    int i = 0;
+
+    char *segment = strtok(line_copy, "|");
+
+    while (segment != NULL && i < cmd_line->num_commands) {
+        cmd_line->commands[i].args = parsing_commands(segment);
+        if (cmd_line->commands[i].args == NULL) {
+            // Erro na tokenização do segmento, liberar tudo
+            for (int k = 0; k < i; k++) {
+                for(int j=0; cmd_line->commands[k].args[j] != NULL; j++) free(cmd_line->commands[k].args[j]);
+                free(cmd_line->commands[k].args);
+            }
+            free(cmd_line->commands);
+            free(cmd_line);
+            free(line_copy);
+            return NULL;
+        }
+        i++;
+        segment = strtok(NULL, "|");
+    }
+    // Se strtok retornou menos segmentos que o esperado (ex: "cmd | | cmd2"), precisa tratar
+    cmd_line->num_commands = i; // Atualiza o número real de comandos parseados
+
+    free(line_copy);
+    return cmd_line;
+}
+
+void free_command_line(CommandLine *cmd_line) {
+    if (!cmd_line) {
+        return;
+    }
+    for (int i = 0; i < cmd_line->num_commands; i++) {
+        if (cmd_line->commands[i].args) {
+            char **arg_ptr = cmd_line->commands[i].args;
+            for (int j = 0; arg_ptr[j] != NULL; j++) {
+                free(arg_ptr[j]);
+            }
+            free(cmd_line->commands[i].args);
         }
     }
-
-    return commands[0];  // Isso é para testes, depois teria que ter outra função para receber return commands;
-
+    free(cmd_line->commands);
+    free(cmd_line);
 }
 
 
