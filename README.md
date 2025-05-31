@@ -12,17 +12,23 @@
 ```sh
 sudo mount -t vboxsf "NomeDaPastaCompartilhada" "PastaVM"
 ```
+### Instale o readline
+```sh
+sudo apt install libreadline-dev
+```
 ### Mude para o diretório que o mount foi executado "PastaVM":
 ```sh
 cd PastaVM
 ```
 ### Para compilar o projeto:
 ```sh
-gcc -c Shell.c
-gcc -o Shell Shell.o
+make
 ```
-
 ### Para Executar o Shell:
 ```sh
-./Shell
+./bin/Shell /usr/bin
+```
+### Especifique o diretorio que contem os comandos externos, caso use "./bin/Shell":
+```sh
+path /usr/bin
 ```
