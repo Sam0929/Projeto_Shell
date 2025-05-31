@@ -1,20 +1,21 @@
-#ifndef SHELL_H_INCLUDED        //BIBLIOTECA PARA IMPLEMENTACAO DOS COMANDOS DO SHELL
-#define SHELL_H_INCLUDED
 
-// Prototype
+// Include
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+#include <unistd.h>
+#include <sys/wait.h>
 
-void replace_ls_exa(char **args);
-void redirect(char **args);
-void absolute_path(char **args);
+#include "shell_commands.h"
 
-// Struct para o path
+// Intern Prototype
 
-typedef struct {
-    char **path_list;
-    int path_count;
-} ShellState;
+static void redirect (char **args);
+static void absolute_path (char **args);
 
-// Comandos a implementar
+
+// Comandos Shell
 
 void cd(char **args) { //Muda o diretório de trabalho.
 
@@ -104,26 +105,73 @@ void exec_command (ShellState *state, char **args) {
 
     // =========== Pai ===========
 
-        int status;
+    int status;
 
-        while (waitpid(pid, &status, 0) == -1 && errno == EINTR); // Aguarda filho, reiniciando se for interrompido por sinal
+    waitpid(pid, &status, WUNTRACED); // WUNTRACED reporta também se o filho foi parado
 
-        if (WIFEXITED(status)) {  // Verifica se o processo filho saiu por exit
-
-            int code = WEXITSTATUS(status);  //Extrai o codigo de saida  de exit
-            if(code != 0 ){
-                fprintf(stderr, "Erro ao executar '%s': %s\n", args[0], strerror(code));  //Exibe o erro do processo filho
-            }
-
-         }
-
-        return;
+    if (WIFEXITED(status)) {
+        int exit_code = WEXITSTATUS(status);
+        if (exit_code != 0 && exit_code != 127) { // 127 é nosso "comando não encontrado"
+            fprintf(stderr, "Comando '%s' terminou com erro (código %d): %s\n",
+                    args[0], exit_code, strerror(exit_code));
+        }
+    } else if (WIFSIGNALED(status)) {
+        int signal_num = WTERMSIG(status);
+        fprintf(stderr, "Comando '%s' terminou devido ao sinal %d (%s)\n",
+                args[0], signal_num, strsignal(signal_num));
+    } else if (WIFSTOPPED(status)) {
+        int signal_num = WSTOPSIG(status);
+        fprintf(stderr, "Comando '%s' foi parado pelo sinal %d (%s)\n",
+                args[0], signal_num, strsignal(signal_num));
+        // AQUI é onde você veria SIGTTIN (sinal 21 geralmente)
+        // Para um shell simples, você pode apenas reportar ou tentar continuar/terminar o filho.
+        // Para job control completo, você adicionaria à lista de jobs parados.
+    }
 
     }
 }
 
+static void redirect (char **args){
 
-//  Fim dos comandos a implementar
+    int redirect = -1;
+
+    for (int i = 0; args[i]; i++) {
+        if (strcmp(args[i], ">") == 0) {
+            redirect = i;
+        }
+    }
+
+    if (redirect != -1){
+        fflush(stdout);
+        args[redirect] = NULL;
+        if (freopen(args[redirect + 1], "w", stdout) == NULL){
+              perror("Erro ao redirecionar saída");
+              _exit(errno);
+        }
+    }
+
+    return;
+}
+
+// void exec_pipe (char **args){
+
+//     int pipe = -1;
+
+//     return;
+
+// }
+
+static void absolute_path(char **args){
+
+    if (strchr(args[0], '/')) {
+
+        execv(args[0], args);   // O comando tem uma barra -> é um caminho direto
+
+        _exit(errno);
+    }
+
+    return;
+}
 
 void help() {
 
@@ -169,57 +217,6 @@ void help() {
 
 }
 
-void redirect (char **args){
-
-    int redirect = -1;
-
-    for (int i = 0; args[i]; i++) {
-        if (strcmp(args[i], ">") == 0) {
-            redirect = i;
-        }
-    }
-
-    if (redirect != -1){
-        fflush(stdout);
-        args[redirect] = NULL;
-        if (freopen(args[redirect + 1], "w", stdout) == NULL){
-              perror("Erro ao redirecionar saída");
-              _exit(errno);
-        }
-    }
-
-    return;
-}
-// void exec_pipe (char **args){
-
-//     int pipe = -1;
-
-//     return;
-
-// }
-void absolute_path(char **args){
-
-    if (strchr(args[0], '/')) {
-
-        execv(args[0], args);   // O comando tem uma barra -> é um caminho direto
-
-        _exit(errno);
-    }
-
-    return;
-}
-
-void free_memory(char **args){
-
-    for (int i = 0; args[i] != NULL; i++) {
-
-        free(args[i]);
-
-    }
-
-    free(args);
-
-}
 void exiting(){
 
     printf("\nExiting...\n\n");
@@ -228,6 +225,4 @@ void exiting(){
 
 }
 
-//  Fim dos Comandos testes
-
-#endif //SHELL_H_INCLUDED
+//  Fim dos Comandos

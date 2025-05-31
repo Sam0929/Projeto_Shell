@@ -22,14 +22,13 @@ cd PastaVM
 ```
 ### Para compilar o projeto:
 ```sh
-gcc -c Shell.c
-gcc -o Shell Shell.o -lreadline
+make
 ```
 ### Para Executar o Shell:
 ```sh
-./Shell /usr/bin
+./bin/Shell /usr/bin
 ```
-### Especifique o diretorio que contem os comandos externos:
+### Especifique o diretorio que contem os comandos externos, caso use "./bin/Shell":
 ```sh
 path /usr/bin
 ```

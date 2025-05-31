@@ -3,3 +3,6 @@ Shell
 *.txt
 .vscode
 sum
+teste/
+bin/
+obj/
