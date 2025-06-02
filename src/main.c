@@ -11,8 +11,6 @@ int main(int argc, char *argv[]) {
 
     ShellState state = {NULL, 0};  // inicializando a struct para o path
 
-    int found = 0;  // flag comando encontrado
-
     if (argc > 1) {
         update_path(&state, argv);
     }
@@ -23,54 +21,54 @@ int main(int argc, char *argv[]) {
 
     while(1) {
 
-        found = 0;
-
-        CommandLine* List_of_Cmds = reading();
+        CommandLine* cmd_line = reading();
 
         // for (int i = 0; args[i] != NULL; i++){          // para testes
         //     printf("%s", args[i]);
         // }
-        print_command_line_details(List_of_Cmds);
+        // print_command_line_details(cmd_line);  // DEBUG
 
-        if (List_of_Cmds == NULL){
+        if (cmd_line == NULL || cmd_line->num_commands == 0) {
+            if (cmd_line) {
+                free_command_line(cmd_line);
+            }
             continue;
-        }
+         }
 
-        if(List_of_Cmds->num_commands == 1){
+        int is_built_in = 0;
 
-            if (strcmp((List_of_Cmds->commands[0].args[0]), "exit") == 0){
+        if(cmd_line->num_commands == 1){
+
+            char **args = cmd_line->commands[0].args;
+
+            if (strcmp((args[0]), "exit") == 0){
+                free_command_line(cmd_line);
                 exiting();
-                found = 1;
-            }else if (strcmp((List_of_Cmds->commands[0].args[0]), "cd") == 0){
-                cd((List_of_Cmds->commands[0].args));
-                found = 1;
+                is_built_in = 1;
             }
-            else if (strcmp((List_of_Cmds->commands[0].args[0]), "clear") == 0){
-                system("clear");
-                found = 1;
+            else if (strcmp((args[0]), "cd") == 0){
+                cd((args));
+                is_built_in = 1;
             }
-            else if (strcmp((List_of_Cmds->commands[0].args[0]), "help") == 0){
+            else if (strcmp((args[0]), "help") == 0){
                 help();
-                found = 1;
+                is_built_in = 1;
             }
-            else if (strcmp((List_of_Cmds->commands[0].args[0]), "path") == 0) {
-                update_path(&state, (List_of_Cmds->commands[0].args));
-                found = 1;
+            else if (strcmp((args[0]), "path") == 0) {
+                update_path(&state, (args));
+                is_built_in = 1;
             }
-            else {
-                exec_command(&state, (List_of_Cmds->commands[0].args));    //DESENVOLVER: tratamento de erros reportados pelo processo pai
-                found = 1;
-            }
-        }
-        else{
-            continue;// Implementar funcao para executar comandos com pipe e paralelo
         }
 
-        free_command_line(List_of_Cmds);  // Necessario para garantir que nenhum vazamento de memória ocorra.
+        if(!is_built_in){
 
-        if (!found) {
-            printf("Invalid command. Type 'help' for a list of valid commands.\n");
+            launch_job(cmd_line, &state, false);    //DESENVOLVER: tratamento de erros reportados pelo processo pai
+            // Implementar funcao para executar comandos com pipe e paralelo
         }
+
+        free_command_line(cmd_line);  // Necessario para garantir que nenhum vazamento de memória ocorra.
+
+
     }
 
 }
