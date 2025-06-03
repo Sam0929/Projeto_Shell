@@ -45,17 +45,33 @@ CommandLine* parse_line(const char *line) {
     cmd_line->commands = NULL;
     cmd_line->num_commands = 0;
 
-    int num_pipes = 0;
-    for (const char *p = line; (p = strchr(p, '|')) != NULL; p++) {  // contagem de pipes, p recebe um ponteiro para o primeiro |, strchar retorna null quando nao existem mais |
-        num_pipes++;
+    char *first_pipe = strchr(line, '|');
+    char *first_parallel = strchr(line, '&');
+    char *separator = NULL;
+
+    if(first_pipe != NULL){
+        separator = first_pipe;
+        cmd_line->flag = 0;
     }
-    int num_cmds = num_pipes + 1;
+    else if (first_parallel != NULL){
+        separator = first_parallel;
+        cmd_line->flag = 1;
+    }
 
-    if (num_cmds == 0 && strlen(line) > 0) {                   // sem pipe mas ainda existe um comando
+    int num_separators = 0;
+    int num_cmds = 0;
+
+    if (separator != NULL){
+        for (const char *p = line; (p = strchr(p, *separator)) != NULL; p++) {  // contagem de pipes, p recebe um ponteiro para o primeiro |, strchar retorna null quando nao existem mais |
+            num_separators++;
+        }
+        num_cmds = num_separators + 1;
+    }
+    else if (num_cmds == 0 && strlen(line) > 0){
         num_cmds = 1;
-    } else if (num_cmds == 0 && strlen(line) == 0) {           //comando vazio
+    }
+    else if (num_cmds == 0 && strlen(line) == 0) {           //comando vazio
         free(cmd_line);
-
         return NULL;
     }
 
@@ -77,10 +93,17 @@ CommandLine* parse_line(const char *line) {
         return NULL;
     }
 
+    char delim[2] = "|";
+
+    if (separator != NULL) {
+        delim[0] = *separator;  // delim agora é "|" ou "&"
+        delim[1] = '\0';
+    }
+
     char *saveptr; // Para strtok_r, se preferir (mais seguro)
     int i = 0;
 
-    char *segment = strtok_r(line_copy, "|", &saveptr);
+    char *segment = strtok_r(line_copy, delim, &saveptr);
 
     while (segment != NULL && i < cmd_line->num_commands) {
 
@@ -95,7 +118,7 @@ CommandLine* parse_line(const char *line) {
         *(end + 1) = '\0'; // Termina a string após o último caractere não-espaço
 
         if (strlen(current_segment) == 0) {                  // Se o usuario digitar cmd1 | | cmd 2
-            segment = strtok_r(NULL, "|", &saveptr); // Pega o próximo
+            segment = strtok_r(NULL, delim, &saveptr); // Pega o próximo
             continue;
         }
 
@@ -113,7 +136,7 @@ CommandLine* parse_line(const char *line) {
             return NULL;
         }
         i++;
-        segment = strtok_r(NULL, "|", &saveptr);
+        segment = strtok_r(NULL, delim, &saveptr);
     }
     cmd_line->num_commands = i;
 
@@ -211,22 +234,4 @@ void print_command_line_details(const CommandLine *cmd_line) {
     fflush(stdout); // Garante que a saída seja impressa imediatamente
 }
 
-// free_memory
 
-void free_command_line(CommandLine *cmd_line) {
-
-    if (!cmd_line) {
-        return;
-    }
-    for (int i = 0; i < cmd_line->num_commands; i++) {
-        if (cmd_line->commands[i].args) {
-            char **arg_ptr = cmd_line->commands[i].args;
-            for (int j = 0; arg_ptr[j] != NULL; j++) {
-                free(arg_ptr[j]);
-            }
-            free(cmd_line->commands[i].args);
-        }
-    }
-    free(cmd_line->commands);
-    free(cmd_line);
-}

@@ -9,6 +9,7 @@
 #include <sys/types.h>
 
 #include "shell_commands.h"
+#include "free_memory.h"
 
 // Intern Prototype
 
@@ -54,11 +55,7 @@ void update_path(ShellState *state, char **args) {
         return;
     }
 
-    for (int i = 0; i < state->path_count; i++) {                     // Libera os caminhos antigos
-        free(state->path_list[i]);
-    }
-
-    free(state->path_list);
+    free_state(state); // Liberar caminhos antigos
 
     int count = 0;                                                   // Conta os novos caminhos
     while (args[count + 1] != NULL) count++;

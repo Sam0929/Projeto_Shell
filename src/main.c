@@ -4,7 +4,7 @@
 
 #include "shell_commands.h"
 #include "read_parse.h"
-
+#include "free_memory.h"
 
 //Main
 
@@ -44,6 +44,7 @@ int main(int argc, char *argv[]) {
 
             if (strcmp((args[0]), "exit") == 0){
                 free_command_line(cmd_line);
+                free_state(&state);
                 exiting();
                 is_built_in = 1;
             }
@@ -66,13 +67,11 @@ int main(int argc, char *argv[]) {
             exec_command(&state, cmd_line->commands[0].args);    //DESENVOLVER: tratamento de erros reportados pelo processo pai
             // Implementar funcao para executar comandos com pipe e paralelo
         }
-        else if (!is_built_in && cmd_line->num_commands > 1){
+        else if (!is_built_in && cmd_line->num_commands > 1 && cmd_line->flag == 0){
             execute_pipeline(cmd_line, &state);
         }
 
         free_command_line(cmd_line);  // Necessario para garantir que nenhum vazamento de memória ocorra.
-
-
 
     }
 
