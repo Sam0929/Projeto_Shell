@@ -5,6 +5,7 @@
 #include "shell_commands.h"
 #include "read_parse.h"
 
+
 //Main
 
 int main(int argc, char *argv[]) {
@@ -60,13 +61,17 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        if(!is_built_in){
+        if(!is_built_in && cmd_line->num_commands == 1){
 
-            launch_job(cmd_line, &state, false);    //DESENVOLVER: tratamento de erros reportados pelo processo pai
+            exec_command(&state, cmd_line->commands[0].args);    //DESENVOLVER: tratamento de erros reportados pelo processo pai
             // Implementar funcao para executar comandos com pipe e paralelo
+        }
+        else if (!is_built_in && cmd_line->num_commands > 1){
+            execute_pipeline(cmd_line, &state);
         }
 
         free_command_line(cmd_line);  // Necessario para garantir que nenhum vazamento de memória ocorra.
+
 
 
     }

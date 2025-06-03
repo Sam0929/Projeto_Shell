@@ -3,9 +3,7 @@
 
 // Include
 
-#include <stdbool.h>
 #include "read_parse.h"
-
 
 // Struct para o path
 
@@ -18,7 +16,8 @@ typedef struct {
 
 void cd(char **args);
 void update_path(ShellState *state, char **args);
-void launch_job (CommandLine *cmd_line, ShellState *state, bool is_background);
+void exec_command (ShellState *state, char **args);
+void execute_pipeline(CommandLine *cmd_line, ShellState *state);
 void help();
 void exiting();
 

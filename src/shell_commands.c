@@ -6,6 +6,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <sys/types.h>
 
 #include "shell_commands.h"
 
@@ -72,23 +73,139 @@ void update_path(ShellState *state, char **args) {
 }
 
 
-static void child_exec_logic(char **args, ShellState *state) {
+void exec_command (ShellState *state, char **args) {
 
-    if (args[0] == NULL) _exit(EXIT_FAILURE); // Comando vazio
+    pid_t pid;
 
-    if (strchr(args[0], '/')) {
-        execv(args[0], args);
-        perror(args[0]);
-        _exit(126);
-    } else {
+    pid = fork();
+
+    if (pid == -1) {
+        perror("fork failed");
+        exit(EXIT_FAILURE);
+    }
+
+    if (pid == 0){
+
+        // =========== FILHO ===========
+
         char exec_path[1024];
-        for (int k = 0; k < state->path_count; k++) {
-            snprintf(exec_path, sizeof(exec_path), "%s/%s", state->path_list[k], args[0]);
-            execv(exec_path, args);
+
+        redirect(args);                     // Verifica se deve haver um redirecionamento do saida padrao do processo filho
+
+        absolute_path(args);                // Verifica se um caminho absoluto foi passado
+
+        for (int i = 0; i < state->path_count; i++) {
+
+            snprintf(exec_path, sizeof(exec_path), "%s/%s", state->path_list[i], args[0]);
+            execv(exec_path, args);                            // tenta executar
         }
-        // Se todos os execv falharam
-        fprintf(stderr, "%s: comando não encontrado\n", args[0]);
-        _exit(127); // Código padrão para "comando não encontrado"
+
+        fprintf(stderr, "%s: comando não encontrado(1)\n", args[0]);
+        _exit(127); // Código de saída padrão para "comando não encontrado"
+    }
+    else{
+
+    // =========== Pai ===========
+
+    int status;
+
+    waitpid(pid, &status, WUNTRACED); // WUNTRACED reporta também se o filho foi parado
+
+    if (WIFEXITED(status)) {
+        int exit_code = WEXITSTATUS(status);
+        if (exit_code != 0 && exit_code != 127) { // 127 é nosso "comando não encontrado"
+            fprintf(stderr, "Comando '%s' terminou com erro (código %d): %s\n",
+                    args[0], exit_code, strerror(exit_code));
+        }
+    } else if (WIFSIGNALED(status)) {
+        int signal_num = WTERMSIG(status);
+        fprintf(stderr, "Comando '%s' terminou devido ao sinal %d (%s)\n",
+                args[0], signal_num, strsignal(signal_num));
+    } else if (WIFSTOPPED(status)) {
+        int signal_num = WSTOPSIG(status);
+        fprintf(stderr, "Comando '%s' foi parado pelo sinal %d (%s)\n",
+                args[0], signal_num, strsignal(signal_num));
+    }
+
+    }
+}
+
+void execute_pipeline(CommandLine *cmd_line, ShellState *state) {
+    int num_cmds = cmd_line->num_commands;
+    int pipes[num_cmds - 1][2];
+    pid_t pids[num_cmds];
+
+    // Criar todos os pipes
+    for (int i = 0; i < num_cmds - 1; i++) {
+        if (pipe(pipes[i]) == -1) {
+            perror("pipe");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    for (int i = 0; i < num_cmds; i++) {
+        pids[i] = fork();
+        if (pids[i] < 0) {
+            perror("fork");
+            exit(EXIT_FAILURE);
+        }
+
+        if (pids[i] == 0) {
+            // === FILHO ===
+            if (i > 0) {
+                dup2(pipes[i - 1][0], STDIN_FILENO);
+            }
+            if (i < num_cmds - 1) {
+                dup2(pipes[i][1], STDOUT_FILENO);
+            }
+
+            // Fechar todos os pipes (não usados)
+            for (int j = 0; j < num_cmds - 1; j++) {
+                close(pipes[j][0]);
+                close(pipes[j][1]);
+            }
+
+            // Verificar redirecionamento e path (como no exec_command)
+            redirect(cmd_line->commands[i].args);
+            absolute_path(cmd_line->commands[i].args);
+
+            char exec_path[1024];
+            for (int j = 0; j < state->path_count; j++) {
+                snprintf(exec_path, sizeof(exec_path), "%s/%s", state->path_list[j], cmd_line->commands[i].args[0]);
+                execv(exec_path, cmd_line->commands[i].args);
+            }
+
+            fprintf(stderr, "%s: comando não encontrado\n", cmd_line->commands[i].args[0]);
+            _exit(127);
+        }
+    }
+
+    // === PAI ===
+    // Fechar todos os pipes
+    for (int i = 0; i < num_cmds - 1; i++) {
+        close(pipes[i][0]);
+        close(pipes[i][1]);
+    }
+
+    // Aguardar todos os filhos
+    for (int i = 0; i < num_cmds; i++) {
+        int status;
+        waitpid(pids[i], &status, WUNTRACED);
+
+        char *cmd = cmd_line->commands[i].args[0];
+
+        if (WIFEXITED(status)) {
+            int exit_code = WEXITSTATUS(status);
+            if (exit_code != 0 && exit_code != 127) {
+                fprintf(stderr, "Comando '%s' falhou com código %d: %s\n", cmd, exit_code, strerror(exit_code));
+            }
+        } else if (WIFSIGNALED(status)) {
+            int sig = WTERMSIG(status);
+            fprintf(stderr, "Comando '%s' terminou com sinal %d (%s)\n", cmd, sig, strsignal(sig));
+        } else if (WIFSTOPPED(status)) {
+            int sig = WSTOPSIG(status);
+            fprintf(stderr, "Comando '%s' foi parado com sinal %d (%s)\n", cmd, sig, strsignal(sig));
+        }
     }
 }
 
@@ -126,126 +243,6 @@ static void absolute_path(char **args){
     return;
 }
 
-void launch_job(CommandLine *cmd_line, ShellState *state, bool is_background) {
-    int num_commands = cmd_line->num_commands;
-    if (num_commands == 0) return;
-
-    // --- INICIALIZAÇÃO DO JOB ---
-    pid_t pids[num_commands];
-    pid_t job_pgid = 0;
-    int i;
-
-
-    int infile_fd = STDIN_FILENO;
-    int outfile_fd = STDOUT_FILENO;
-    int prev_pipe_read_end = STDIN_FILENO;
-
-
-    for (i = 0; i < num_commands; i++) {
-        int current_pipe_fds[2] = {-1, -1};
-
-        if (i < num_commands - 1) {
-            if (pipe(current_pipe_fds) < 0) {
-                perror("pipe");
-                return;
-            }
-            outfile_fd = current_pipe_fds[1];
-        } else {
-            outfile_fd = STDOUT_FILENO;
-        }
-
-        pids[i] = fork();
-        if (pids[i] < 0) {
-            perror("fork");
-            if (current_pipe_fds[0] != -1) { close(current_pipe_fds[0]); close(current_pipe_fds[1]); }
-            if (prev_pipe_read_end != STDIN_FILENO) close(prev_pipe_read_end);
-            return;
-        }
-
-        if (pids[i] == 0) {
-            pid_t current_pid = getpid();
-            if (job_pgid == 0) {
-                job_pgid = current_pid;
-            }
-            setpgid(current_pid, job_pgid);
-
-            // Configurar STDIN
-            if (prev_pipe_read_end != STDIN_FILENO) {
-                if (dup2(prev_pipe_read_end, STDIN_FILENO) < 0) {
-                    perror("dup2 stdin"); _exit(EXIT_FAILURE);
-                }
-                close(prev_pipe_read_end);
-            }
-
-
-            if (outfile_fd != STDOUT_FILENO) {
-                if (dup2(outfile_fd, STDOUT_FILENO) < 0) {
-                    perror("dup2 stdout"); _exit(EXIT_FAILURE);
-                }
-                close(outfile_fd);
-            }
-
-            if (current_pipe_fds[0] != -1) close(current_pipe_fds[0]);
-
-            if (i == num_commands - 1) {
-                redirect(cmd_line->commands[i].args);
-            }
-
-            child_exec_logic(cmd_line->commands[i].args, state);
-
-        }
-
-        if (job_pgid == 0) {
-            job_pgid = pids[i];
-        }
-        setpgid(pids[i], job_pgid);
-
-
-        if (prev_pipe_read_end != STDIN_FILENO) {
-            close(prev_pipe_read_end);
-        }
-        if (outfile_fd != STDOUT_FILENO) {
-            close(outfile_fd);
-        }
-
-        prev_pipe_read_end = current_pipe_fds[0];
-
-        if (i < num_commands - 1) {
-            prev_pipe_read_end = current_pipe_fds[0];
-        } else {
-            if(current_pipe_fds[0] != -1) close(current_pipe_fds[0]);
-            prev_pipe_read_end = -1;
-        }
-    } // Fim do loop de fork
-
-    // --- PAI ESPERA (se for foreground) ---
-    if (!is_background) {
-
-        for (int j = 0; j < num_commands; j++) {
-            int status;
-
-            if (waitpid(pids[j], &status, WUNTRACED) > 0) {
-                if (WIFEXITED(status)) {
-                    int exit_code = WEXITSTATUS(status);
-                    if (j == num_commands - 1 && exit_code != 0 && exit_code != 127) {
-                        fprintf(stderr, "Pipeline terminou com erro (código %d)\n", exit_code);
-                    }
-                } else if (WIFSIGNALED(status)) {
-
-                } else if (WIFSTOPPED(status)) {
-
-                }
-            } else if (errno != ECHILD) {
-                perror("waitpid no pipeline");
-            }
-        }
-
-    } else {
-
-        printf("Job em background iniciado com PGID: %d\n", job_pgid);
-
-    }
-}
 
 void help() {
 
