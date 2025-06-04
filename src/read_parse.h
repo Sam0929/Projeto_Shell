@@ -9,7 +9,7 @@ typedef struct {
 
 typedef struct {
     ParsedCommand *commands; // Array de comandos
-    int num_commands;        // Número de comandos no pipeline (1 se não for pipeline)
+    int num_commands;        // Número de comandos no pipe (1 se não for pipe)
     int flag;
 } CommandLine;
 

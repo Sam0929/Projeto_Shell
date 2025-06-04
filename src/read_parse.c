@@ -44,20 +44,18 @@ CommandLine* parse_line(const char *line) {
     }
     cmd_line->commands = NULL;
     cmd_line->num_commands = 0;
-
-    char *first_pipe = strchr(line, '|');
-    char *first_parallel = strchr(line, '&');
-    char *separator = NULL;
-
-    if(first_pipe != NULL){
-        separator = first_pipe;
+    // 2. Definir se existe um pipe ou paralelo
+    char *separator = strchr(line, '|');
+    if (separator == NULL){
+        separator = strchr(line, '&');
+        if(separator != NULL){
+            cmd_line->flag = 1;
+        }
+    }
+    else{
         cmd_line->flag = 0;
     }
-    else if (first_parallel != NULL){
-        separator = first_parallel;
-        cmd_line->flag = 1;
-    }
-
+    // 3. Contar quantos comandos existem
     int num_separators = 0;
     int num_cmds = 0;
 
@@ -93,37 +91,54 @@ CommandLine* parse_line(const char *line) {
         return NULL;
     }
 
-    char delim[2] = "|";
-
-    if (separator != NULL) {
-        delim[0] = *separator;  // delim agora é "|" ou "&"
-        delim[1] = '\0';
-    }
-
-    char *saveptr; // Para strtok_r, se preferir (mais seguro)
     int i = 0;
 
-    char *segment = strtok_r(line_copy, delim, &saveptr);
+    if (separator != NULL){
+        char delim[2];
+        delim[0] = *separator;  // delim agora é "|" ou "&"
+        delim[1] = '\0';
 
-    while (segment != NULL && i < cmd_line->num_commands) {
+        char *saveptr; // Para strtok_r, se preferir (mais seguro)
 
-        char *current_segment = segment;
-        while (isspace((unsigned char)*current_segment)) {
-            current_segment++;
+
+        char *segment = strtok_r(line_copy, delim, &saveptr);
+
+        while (segment != NULL && i < cmd_line->num_commands) {
+
+            char *current_segment = segment;
+            while (isspace((unsigned char)*current_segment)) {
+                current_segment++;
+            }
+            char *end = current_segment + strlen(current_segment) - 1;
+            while (end > current_segment && isspace((unsigned char)*end)) {
+                end--;
+            }
+            *(end + 1) = '\0'; // Termina a string após o último caractere não-espaço
+
+            if (strlen(current_segment) == 0) {                  // Se o usuario digitar cmd1 | | cmd 2
+                segment = strtok_r(NULL, delim, &saveptr); // Pega o próximo
+                continue;
+            }
+
+            cmd_line->commands[i].args = parsing_commands(current_segment);
+
+            if (cmd_line->commands[i].args == NULL) {
+                // Erro na tokenização do segmento, liberar tudo
+                for (int k = 0; k < i; k++) {
+                    for(int j=0; cmd_line->commands[k].args[j] != NULL; j++) free(cmd_line->commands[k].args[j]);
+                    free(cmd_line->commands[k].args);
+                }
+                free(cmd_line->commands);
+                free(cmd_line);
+                free(line_copy);
+                return NULL;
+            }
+            i++;
+            segment = strtok_r(NULL, delim, &saveptr);
         }
-        char *end = current_segment + strlen(current_segment) - 1;
-        while (end > current_segment && isspace((unsigned char)*end)) {
-            end--;
-        }
-        *(end + 1) = '\0'; // Termina a string após o último caractere não-espaço
-
-        if (strlen(current_segment) == 0) {                  // Se o usuario digitar cmd1 | | cmd 2
-            segment = strtok_r(NULL, delim, &saveptr); // Pega o próximo
-            continue;
-        }
-
-        cmd_line->commands[i].args = parsing_commands(current_segment);
-
+    }
+    else{
+        cmd_line->commands[i].args = parsing_commands(line_copy);
         if (cmd_line->commands[i].args == NULL) {
             // Erro na tokenização do segmento, liberar tudo
             for (int k = 0; k < i; k++) {
@@ -136,7 +151,6 @@ CommandLine* parse_line(const char *line) {
             return NULL;
         }
         i++;
-        segment = strtok_r(NULL, delim, &saveptr);
     }
     cmd_line->num_commands = i;
 
@@ -196,7 +210,7 @@ void print_command_line_details(const CommandLine *cmd_line) {
     }
 
     printf("DEBUG: --- Detalhes da CommandLine ---\n");
-    printf("DEBUG: Número total de comandos no pipeline: %d\n", cmd_line->num_commands);
+    printf("DEBUG: Número total de comandos no pipe: %d\n", cmd_line->num_commands);
 
     if (cmd_line->num_commands == 0) {
         printf("DEBUG: Nenhum comando para exibir (num_commands é 0).\n");
@@ -217,7 +231,7 @@ void print_command_line_details(const CommandLine *cmd_line) {
 
         if (cmd_line->commands[i].args == NULL) {
             printf("DEBUG:     args para o Comando %d é NULL.\n", i);
-            continue; // Passa para o próximo comando no pipeline
+            continue; // Passa para o próximo comando no pipe
         }
 
         char **current_args = cmd_line->commands[i].args;

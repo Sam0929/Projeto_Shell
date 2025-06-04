@@ -17,7 +17,8 @@ typedef struct {
 void cd(char **args);
 void update_path(ShellState *state, char **args);
 void exec_command (ShellState *state, char **args);
-void execute_pipeline(CommandLine *cmd_line, ShellState *state);
+void execute_pipe(CommandLine *cmd_line, ShellState *state);
+void execute_parallel (CommandLine *cmd_line, ShellState *state);
 void help();
 void exiting();
 

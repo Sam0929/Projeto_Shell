@@ -25,7 +25,9 @@ void free_command_line(CommandLine *cmd_line) {
 }
 
 void free_state (ShellState *state){
-
+    if (!state) {
+        return;
+    }
     if (state->path_count != 0){
 
         for (int i = 0; i < state->path_count; i++) {

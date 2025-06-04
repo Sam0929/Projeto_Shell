@@ -14,24 +14,13 @@
 // Intern Prototype
 
 static void redirect (char **args);
-static void absolute_path (char **args);
-
 
 // Comandos Shell
 
 void cd(char **args) { //Muda o diretório de trabalho.
 
     if (args[1] == NULL) {
-
-        const char *home_dir = getenv("HOME");
-        if (home_dir == NULL) {
-            fprintf(stderr, "cd: variável HOME não definida\n");
-            return;
-        }
-        if (chdir(home_dir) == -1) {
-            perror("cd");
-        }
-
+        return;
     } else if (args[2] != NULL) { // "cd dir1 dir2" e um erro
         fprintf(stderr, "cd: muitos argumentos\n");
     }
@@ -42,7 +31,7 @@ void cd(char **args) { //Muda o diretório de trabalho.
     }
 }
 
-void update_path(ShellState *state, char **args) {
+void update_path(ShellState *state, char **args) {             // VERIFICAR ESSA FUNCAO
 
     if (args[1] == NULL) {
                                                                 // Nenhum argumento extra: mostrar os caminhos atuais
@@ -62,11 +51,39 @@ void update_path(ShellState *state, char **args) {
 
 
     state->path_list = malloc(count * sizeof(char *));              // Aloca e copia os novos caminhos
+    if (state->path_list == NULL) {
+        perror("malloc update_path");
+        state->path_count = 0; // Resetar estado
+        return;
+    }
     state->path_count = count;
 
     for (int i = 0; i < count; i++) {
         state->path_list[i] = strdup(args[i + 1]);
+        if (state->path_list[i] == NULL) {
+            perror("strdup update_path");
+            //n sei o que fazer ainda
+        }
     }
+}
+static void child_exec_logic(char **args, ShellState *state) {
+    if (args[0] == NULL) _exit(EXIT_FAILURE);
+
+
+    if (strchr(args[0], '/')) {
+        execv(args[0], args);
+    }
+
+    // Tentativa com PATH
+    char exec_path[1024];
+    for (int k = 0; k < state->path_count; k++) {
+        snprintf(exec_path, sizeof(exec_path), "%s/%s", state->path_list[k], args[0]);
+        execv(exec_path, args); // Se bem-sucedido, não retorna
+    }
+
+    // Se chegou aqui, nenhum execv teve sucesso
+    fprintf(stderr, "%s: comando não encontrado (child_exec_logic)\n", args[0]);
+    _exit(127);
 }
 
 
@@ -85,20 +102,9 @@ void exec_command (ShellState *state, char **args) {
 
         // =========== FILHO ===========
 
-        char exec_path[1024];
-
         redirect(args);                     // Verifica se deve haver um redirecionamento do saida padrao do processo filho
 
-        absolute_path(args);                // Verifica se um caminho absoluto foi passado
-
-        for (int i = 0; i < state->path_count; i++) {
-
-            snprintf(exec_path, sizeof(exec_path), "%s/%s", state->path_list[i], args[0]);
-            execv(exec_path, args);                            // tenta executar
-        }
-
-        fprintf(stderr, "%s: comando não encontrado(1)\n", args[0]);
-        _exit(127); // Código de saída padrão para "comando não encontrado"
+        child_exec_logic(args, state);
     }
     else{
 
@@ -127,7 +133,7 @@ void exec_command (ShellState *state, char **args) {
     }
 }
 
-void execute_pipeline(CommandLine *cmd_line, ShellState *state) {
+void execute_pipe(CommandLine *cmd_line, ShellState *state) {
     int num_cmds = cmd_line->num_commands;
     int pipes[num_cmds - 1][2];
     pid_t pids[num_cmds];
@@ -149,6 +155,8 @@ void execute_pipeline(CommandLine *cmd_line, ShellState *state) {
 
         if (pids[i] == 0) {
             // === FILHO ===
+            char **args = cmd_line->commands[i].args;
+
             if (i > 0) {
                 dup2(pipes[i - 1][0], STDIN_FILENO);
             }
@@ -163,17 +171,10 @@ void execute_pipeline(CommandLine *cmd_line, ShellState *state) {
             }
 
             // Verificar redirecionamento e path (como no exec_command)
-            redirect(cmd_line->commands[i].args);
-            absolute_path(cmd_line->commands[i].args);
-
-            char exec_path[1024];
-            for (int j = 0; j < state->path_count; j++) {
-                snprintf(exec_path, sizeof(exec_path), "%s/%s", state->path_list[j], cmd_line->commands[i].args[0]);
-                execv(exec_path, cmd_line->commands[i].args);
+            if (i == num_cmds - 1){                   // Somente se for o ultimo comando
+                redirect(args);
             }
-
-            fprintf(stderr, "%s: comando não encontrado\n", cmd_line->commands[i].args[0]);
-            _exit(127);
+            child_exec_logic(args, state);
         }
     }
 
@@ -206,6 +207,51 @@ void execute_pipeline(CommandLine *cmd_line, ShellState *state) {
     }
 }
 
+void execute_parallel (CommandLine *cmd_line, ShellState *state){
+
+    int num_cmds = cmd_line->num_commands;
+    pid_t pids[num_cmds];
+
+    for (int i = 0; i < num_cmds; i++) {
+
+        pids[i] = fork();
+        if (pids[i] < 0) {
+            perror("fork");
+            exit(EXIT_FAILURE);
+        }
+
+        if (pids[i] == 0) {
+            // === FILHO ===
+            char **args = cmd_line->commands[i].args;
+            if (i == num_cmds - 1){                   // Somente se for o ultimo comando
+                redirect(args);
+            }
+            child_exec_logic(args, state);
+        }
+    }
+    // === PAI ===
+    // Aguardar todos os filhos
+    for (int i = 0; i < num_cmds; i++) {
+        int status;
+        waitpid(pids[i], &status, WUNTRACED);
+
+        char *cmd = cmd_line->commands[i].args[0];
+
+        if (WIFEXITED(status)) {
+            int exit_code = WEXITSTATUS(status);
+            if (exit_code != 0 && exit_code != 127) {
+                fprintf(stderr, "Comando '%s' falhou com código %d: %s\n", cmd, exit_code, strerror(exit_code));
+            }
+        } else if (WIFSIGNALED(status)) {
+            int sig = WTERMSIG(status);
+            fprintf(stderr, "Comando '%s' terminou com sinal %d (%s)\n", cmd, sig, strsignal(sig));
+        } else if (WIFSTOPPED(status)) {
+            int sig = WSTOPSIG(status);
+            fprintf(stderr, "Comando '%s' foi parado com sinal %d (%s)\n", cmd, sig, strsignal(sig));
+        }
+    }
+}
+
 static void redirect (char **args){
 
     int redirect = -1;
@@ -213,33 +259,27 @@ static void redirect (char **args){
     for (int i = 0; args[i]; i++) {
         if (strcmp(args[i], ">") == 0) {
             redirect = i;
+            break;
         }
     }
+    if (redirect != -1) {
 
-    if (redirect != -1){
         fflush(stdout);
-        args[redirect] = NULL;
-        if (freopen(args[redirect + 1], "w", stdout) == NULL){
-              perror("Erro ao redirecionar saída");
-              _exit(errno);
+        args[redirect] = NULL; // Remove '>' dos argumentos para o execv
+
+        if (args[redirect + 1] == NULL) { // VERIFICAÇÃO ADICIONADA
+            fprintf(stderr, "Erro: nome de arquivo ausente para redirecionamento '>'\n");
+            _exit(EXIT_FAILURE); // Ou algum outro código de erro apropriado
+        }
+
+        if (freopen(args[redirect + 1], "w", stdout) == NULL) {
+            perror("Erro ao redirecionar saída");
+            _exit(errno);
         }
     }
 
     return;
 }
-
-static void absolute_path(char **args){
-
-    if (strchr(args[0], '/')) {
-
-        execv(args[0], args);   // O comando tem uma barra -> é um caminho direto
-
-        _exit(errno);
-    }
-
-    return;
-}
-
 
 void help() {
 
@@ -275,7 +315,6 @@ void help() {
     printf("Observações:\n");
     printf("--------------------------------------------------------\n");
     printf("  - Os comandos são separados por espaços (como em qualquer terminal Unix).\n");
-    printf("  - Ainda não há suporte para redirecionamentos (>, >>) ou pipes (|).\n");
     printf("  - Pressione Ctrl+C para encerrar comandos em execução (se necessário).\n");
     printf("  - Este shell é um projeto educacional com funcionalidades básicas.\n\n");
 

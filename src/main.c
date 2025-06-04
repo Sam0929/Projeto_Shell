@@ -68,7 +68,10 @@ int main(int argc, char *argv[]) {
             // Implementar funcao para executar comandos com pipe e paralelo
         }
         else if (!is_built_in && cmd_line->num_commands > 1 && cmd_line->flag == 0){
-            execute_pipeline(cmd_line, &state);
+            execute_pipe(cmd_line, &state);
+        }
+        else if (!is_built_in && cmd_line->num_commands > 1 && cmd_line->flag == 1){
+            execute_parallel(cmd_line, &state);
         }
 
         free_command_line(cmd_line);  // Necessario para garantir que nenhum vazamento de memória ocorra.
