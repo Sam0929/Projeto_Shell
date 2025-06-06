@@ -4,73 +4,76 @@
 
 #include "shell_commands.h"
 #include "read_parse.h"
+#include "free_memory.h"
+#include "intro.h"
+
 
 //Main
 
 int main(int argc, char *argv[]) {
 
-    ShellState state = {NULL, 0};  // inicializando a struct para o path
-
-    int found = 0;  // flag comando encontrado
+    ShellState *state = malloc(sizeof(ShellState));  // inicializando a struct para o path
+    state->path_list = NULL;
+    state->path_count = 0;
 
     if (argc > 1) {
-        update_path(&state, argv);
+        update_path(state, argv);
     }
 
-    printf("SamTum Terminal\n\n");
-    printf("Welcome To SamTum Terminal\n");
-    printf("Type \"help\" for more things!\n\n");
+    exibir_intro_terminal();
 
     while(1) {
 
-        found = 0;
-
-        CommandLine* List_of_Cmds = reading();
+        CommandLine* cmd_line = reading();
 
         // for (int i = 0; args[i] != NULL; i++){          // para testes
         //     printf("%s", args[i]);
         // }
-        print_command_line_details(List_of_Cmds);
+        // print_command_line_details(cmd_line);  // DEBUG
 
-        if (List_of_Cmds == NULL){
+        if (cmd_line == NULL || cmd_line->num_commands == 0) {
+            if (cmd_line) {
+                free_command_line(cmd_line);
+            }
             continue;
-        }
+         }
 
-        if(List_of_Cmds->num_commands == 1){
+        int is_built_in = 0;
 
-            if (strcmp((List_of_Cmds->commands[0].args[0]), "exit") == 0){
-                exiting();
-                found = 1;
-            }else if (strcmp((List_of_Cmds->commands[0].args[0]), "cd") == 0){
-                cd((List_of_Cmds->commands[0].args));
-                found = 1;
+        if(cmd_line->num_commands == 1){
+
+            char **args = cmd_line->commands[0].args;
+
+            if (strcmp((args[0]), "exit") == 0){
+                exiting(cmd_line, state);
+                is_built_in = 1;
             }
-            else if (strcmp((List_of_Cmds->commands[0].args[0]), "clear") == 0){
-                system("clear");
-                found = 1;
+            else if (strcmp((args[0]), "cd") == 0){
+                cd((args));
+                is_built_in = 1;
             }
-            else if (strcmp((List_of_Cmds->commands[0].args[0]), "help") == 0){
+            else if (strcmp((args[0]), "help") == 0){
                 help();
-                found = 1;
+                is_built_in = 1;
             }
-            else if (strcmp((List_of_Cmds->commands[0].args[0]), "path") == 0) {
-                update_path(&state, (List_of_Cmds->commands[0].args));
-                found = 1;
+            else if (strcmp((args[0]), "path") == 0) {
+                update_path(state, (args));
+                is_built_in = 1;
             }
-            else {
-                exec_command(&state, (List_of_Cmds->commands[0].args));    //DESENVOLVER: tratamento de erros reportados pelo processo pai
-                found = 1;
-            }
-        }
-        else{
-            continue;// Implementar funcao para executar comandos com pipe e paralelo
         }
 
-        free_command_line(List_of_Cmds);  // Necessario para garantir que nenhum vazamento de memória ocorra.
-
-        if (!found) {
-            printf("Invalid command. Type 'help' for a list of valid commands.\n");
+        if(!is_built_in && cmd_line->num_commands == 1){
+            exec_command(state, cmd_line->commands[0].args);
         }
+        else if (!is_built_in && cmd_line->num_commands > 1 && cmd_line->flag == 0){
+            execute_pipe(cmd_line, state);
+        }
+        else if (!is_built_in && cmd_line->num_commands > 1 && cmd_line->flag == 1){
+            execute_parallel(cmd_line, state);
+        }
+
+        free_command_line(cmd_line);  // Necessario para garantir que nenhum vazamento de memória ocorra.
+
     }
 
 }

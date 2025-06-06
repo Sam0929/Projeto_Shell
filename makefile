@@ -20,7 +20,7 @@ TARGET_NAME = Shell
 TARGET = $(BINDIR)/$(TARGET_NAME)
 
 # Lista dos NOMES BASE dos seus arquivos fonte .c (sem o src/)
-SOURCES_NAMES = main.c read_parse.c shell_commands.c
+SOURCES_NAMES = main.c read_parse.c shell_commands.c free_memory.c intro.c
 
 # Constrói o caminho completo para os arquivos fonte em src/
 SOURCES = $(foreach name,$(SOURCES_NAMES),$(SRCDIR)/$(name))
