@@ -9,7 +9,7 @@
 // Prototype
 
 void free_command_line(CommandLine *cmd_line);
-void free_state (ShellState *state);
+void free_path_list (ShellState *state);
 
 //
 

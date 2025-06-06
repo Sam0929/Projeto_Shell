@@ -24,7 +24,7 @@ void free_command_line(CommandLine *cmd_line) {
     free(cmd_line);
 }
 
-void free_state (ShellState *state){
+void free_path_list (ShellState *state){
     if (!state) {
         return;
     }
@@ -36,4 +36,6 @@ void free_state (ShellState *state){
 
         free(state->path_list);
     }
+    state->path_list = NULL;
+    state->path_count = 0;
 }

@@ -8,12 +8,19 @@
 #include <readline/history.h>
 
 #include "read_parse.h"
+#define BOLDGREEN   "\033[1m\033[32m"      /* Bold Green */
+#define RESET   "\033[0m"
 
 // Functions to read and parse
 
 CommandLine* reading(){
 
-    char *linha = readline(">>> ");
+    printf(BOLDGREEN);
+
+    char *linha = readline(">>> ");            //Readline para ler o input do usuario
+
+    printf(RESET);
+    fflush(stdout);
 
     if (linha == NULL) {
         // Ctrl+D
@@ -72,7 +79,7 @@ CommandLine* parse_line(const char *line) {
         free(cmd_line);
         return NULL;
     }
-
+    // 4. Alocar memoria para os comandos
     cmd_line->num_commands = num_cmds;
     cmd_line->commands = malloc(num_cmds * sizeof(ParsedCommand));
 
@@ -90,18 +97,16 @@ CommandLine* parse_line(const char *line) {
         free(cmd_line);
         return NULL;
     }
-
+    // 5. Se houver separadores, separa a string em comandos e os comandos em argumentos
     int i = 0;
-
     if (separator != NULL){
         char delim[2];
         delim[0] = *separator;  // delim agora é "|" ou "&"
         delim[1] = '\0';
 
-        char *saveptr; // Para strtok_r, se preferir (mais seguro)
+        char *saveptr;
 
-
-        char *segment = strtok_r(line_copy, delim, &saveptr);
+        char *segment = strtok_r(line_copy, delim, &saveptr); // Necessario strtok_r porque usaremos strtok em parsing_commands
 
         while (segment != NULL && i < cmd_line->num_commands) {
 
@@ -115,7 +120,7 @@ CommandLine* parse_line(const char *line) {
             }
             *(end + 1) = '\0'; // Termina a string após o último caractere não-espaço
 
-            if (strlen(current_segment) == 0) {                  // Se o usuario digitar cmd1 | | cmd 2
+            if (strlen(current_segment) == 0) {             // Se o usuario digitar cmd1 | | cmd 2
                 segment = strtok_r(NULL, delim, &saveptr); // Pega o próximo
                 continue;
             }
@@ -123,7 +128,6 @@ CommandLine* parse_line(const char *line) {
             cmd_line->commands[i].args = parsing_commands(current_segment);
 
             if (cmd_line->commands[i].args == NULL) {
-                // Erro na tokenização do segmento, liberar tudo
                 for (int k = 0; k < i; k++) {
                     for(int j=0; cmd_line->commands[k].args[j] != NULL; j++) free(cmd_line->commands[k].args[j]);
                     free(cmd_line->commands[k].args);
@@ -137,6 +141,7 @@ CommandLine* parse_line(const char *line) {
             segment = strtok_r(NULL, delim, &saveptr);
         }
     }
+    // 5. Se nao houver sepadores, so ha um comando, entao separa o comando em argumentos
     else{
         cmd_line->commands[i].args = parsing_commands(line_copy);
         if (cmd_line->commands[i].args == NULL) {

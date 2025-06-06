@@ -20,7 +20,7 @@ void exec_command (ShellState *state, char **args);
 void execute_pipe(CommandLine *cmd_line, ShellState *state);
 void execute_parallel (CommandLine *cmd_line, ShellState *state);
 void help();
-void exiting();
+void exiting(CommandLine *cmd_line, ShellState *state);
 
 // Fim
 
