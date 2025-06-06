@@ -2,10 +2,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "shell_commands.h"
-#include "read_parse.h"
-#include "free_memory.h"
-#include "intro.h"
+#include "../include/shell_commands.h"
+#include "../include/read_parse.h"
+#include "../include/free_memory.h"
+#include "../include/intro.h"
 
 
 //Main

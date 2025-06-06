@@ -6,10 +6,9 @@
 #include <errno.h>
 #include <unistd.h>
 #include <sys/wait.h>
-#include <sys/types.h>
 
-#include "shell_commands.h"
-#include "free_memory.h"
+#include "../include/shell_commands.h"
+#include "../include/free_memory.h"
 
 // Intern Prototype
 

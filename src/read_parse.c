@@ -7,7 +7,7 @@
 #include <readline/readline.h>           //Biblioteca para suportar comandos de um terminal real, como seta pra cima ou pra baixo, historico de comandos, ctrl a, ctrl e, etc
 #include <readline/history.h>
 
-#include "read_parse.h"
+#include "../include/read_parse.h"
 #define BOLDGREEN   "\033[1m\033[32m"      /* Bold Green */
 #define RESET   "\033[0m"
 
