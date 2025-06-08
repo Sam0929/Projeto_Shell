@@ -1,4 +1,3 @@
-
 // Include
 #include <stdio.h>
 #include <stdlib.h>
@@ -6,6 +5,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
 
 #include "../include/shell_commands.h"
 #include "../include/free_memory.h"
@@ -106,6 +106,14 @@ static void child_exec_logic(char **args, ShellState *state) {
 
 
 void exec_command (ShellState *state, char **args) {
+    // Verifica se é um script shell
+    if (args[0] != NULL) {
+        struct stat st;
+        if (stat(args[0], &st) == 0 && S_ISREG(st.st_mode) && (st.st_mode & S_IXUSR)) {
+            execute_shell_script(args[0]);
+            return;
+        }
+    }
 
     pid_t pid;
 
@@ -363,6 +371,52 @@ void exiting(CommandLine *cmd_line, ShellState *state){
 
     exit(0);
 
+}
+
+void execute_shell_script(const char *filename) {
+    // Verifica se o arquivo existe e tem permissão de execução
+    struct stat st;
+    if (stat(filename, &st) != 0) {
+        fprintf(stderr, "Erro: Arquivo '%s' não encontrado\n", filename);
+        return;
+    }
+
+    // Verifica se é um arquivo regular
+    if (!S_ISREG(st.st_mode)) {
+        fprintf(stderr, "Erro: '%s' não é um arquivo regular\n", filename);
+        return;
+    }
+
+    // Verifica se tem permissão de execução
+    if (!(st.st_mode & S_IXUSR)) {
+        fprintf(stderr, "Erro: '%s' não tem permissão de execução\n", filename);
+        return;
+    }
+
+    // Executa o script
+    pid_t pid = fork();
+    if (pid < 0) {
+        perror("fork");
+        return;
+    }
+
+    if (pid == 0) {
+        // Processo filho
+        execl(filename, filename, NULL);
+        perror("execl");
+        _exit(1);
+    } else {
+        // Processo pai
+        int status;
+        waitpid(pid, &status, 0);
+        
+        if (WIFEXITED(status)) {
+            int exit_code = WEXITSTATUS(status);
+            if (exit_code != 0) {
+                fprintf(stderr, "Script '%s' terminou com código de saída %d\n", filename, exit_code);
+            }
+        }
+    }
 }
 
 //  Fim dos Comandos

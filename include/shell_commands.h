@@ -21,6 +21,7 @@ void execute_pipe(CommandLine *cmd_line, ShellState *state);
 void execute_parallel (CommandLine *cmd_line, ShellState *state);
 void help();
 void exiting(CommandLine *cmd_line, ShellState *state);
+void execute_shell_script(const char *filename);
 
 // Fim
 
