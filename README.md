@@ -77,5 +77,4 @@ echo "Olá mundo"
 
 * Desenvolvido por Samuel.
 
-```
 
