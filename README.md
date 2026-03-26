@@ -6,8 +6,6 @@ Este projeto consiste na implementação de uma **shell simples**, desenvolvida 
 
 O principal objetivo deste projeto é simular o comportamento básico de um terminal, permitindo a execução de comandos e interação com o sistema operacional.
 
-Projetos desse tipo são comuns para estudo de sistemas, pois ajudam a entender como o sistema gerencia processos e comandos :contentReference[oaicite:0]{index=0}.
-
 ## ⚙️ Funcionalidades
 
 - Execução de comandos do sistema
