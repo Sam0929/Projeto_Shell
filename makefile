@@ -5,7 +5,7 @@ CC = gcc
 SRCDIR = src
 OBJDIR = obj
 BINDIR = bin
-INCLUDEDIR = include # Mesmo que você não use agora, é bom ter
+INCLUDEDIR = include 
 
 # Flags de compilação:
 # -I$(SRCDIR) e -I$(INCLUDEDIR) dizem ao compilador para procurar headers nessas pastas.
@@ -19,7 +19,7 @@ LDFLAGS = -lreadline
 TARGET_NAME = Shell
 TARGET = $(BINDIR)/$(TARGET_NAME)
 
-# Lista dos NOMES BASE dos seus arquivos fonte .c (sem o src/)
+# Lista dos NOMES BASE dos arquivos fonte .c (sem o src/)
 SOURCES_NAMES = main.c read_parse.c shell_commands.c free_memory.c intro.c
 
 # Constrói o caminho completo para os arquivos fonte em src/
@@ -31,7 +31,7 @@ OBJECTS = $(patsubst $(SRCDIR)/%.c,$(OBJDIR)/%.o,$(SOURCES))
 
 # --- Regras do Makefile ---
 
-# Regra padrão (o que acontece se você só digitar "make")
+
 all: $(TARGET)
 
 # Regra para linkar os arquivos objeto e criar o executável
